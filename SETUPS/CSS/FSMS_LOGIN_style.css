@@ -1,0 +1,115 @@
+
+/* Global body styles */
+body {
+    font-family: 'Arial', sans-serif; /* Sets the default font for the page */
+    margin: 0;
+    padding: 0;
+    background-size: auto cover; /* Ensures the background image covers the entire page */
+    background-position: center;
+    transition: background-image 15s ease-in-out; /* Smooth transition between background images */
+    background-repeat: no-repeat;
+}
+
+/* Logo container styling */
+.logo {
+    position: absolute;
+    top: 10px;
+    left:10px;
+}
+
+.logo img {
+    width: 80px; /* Adjust the logo size as needed */
+    height: auto;
+}
+
+/* Header styles */
+h1, h2 {
+    text-align: center; /* Centers the text */
+    color: #4CAF50; /* Matching green color for a fresh theme */
+    font-family: 'Comic Sans MS', cursive, sans-serif; /* Fun font for a food theme */
+}
+
+/* Container styling for login and register forms */
+.container {
+    width: 100%;
+    max-width: 400px; /* Limits the maximum width of the container */
+    margin: 20px auto; /* Centers the container */
+    padding: 20px;
+    background-color: rgba(255, 255, 255, 0.8); /* Adds a slight transparency to the background */
+    border-radius: 8px; /* Rounds the corners of the container */
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.2); /* Adds a shadow around the container */
+    border: 2px solid #4CAF50; /* Adds a green border for a fresh look */
+}        
+
+/* Form styling */
+form {
+    display: flex;
+    flex-direction: column; /* Stacks form elements vertically */
+}
+
+/* Label styling */
+label {
+    font-size: 1rem;
+    color: #333; /* Dark grey color for labels */
+}
+
+/* Input field styling */
+input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin: 5px 0;
+    font-size: 1rem;
+}
+
+/* Input focus styling */
+input:focus {
+    border-color: #4CAF50; /* Green border when input is focused */
+    outline: none;
+}
+
+/* Button styling */
+button {
+    padding: 8px; /* Reduced button size for a more compact look */
+    background-color: #4CAF50; /* Green background */
+    color: white; /* White text color */
+    border: none;
+    border-radius: 4px;
+    cursor: pointer; /* Changes cursor to pointer on hover */
+    font-size: 0.9rem; /* Slightly smaller font size for buttons */
+    margin: 10px 0;
+}
+
+/* Button hover and active states */
+button:hover {
+    background-color: #45a049; /* Darker green on hover */
+}
+
+button:active {
+    background-color: #388e3c; /* Even darker green when button is pressed */
+}
+
+/* Centering the register button */
+.center-button {
+    text-align: center;
+}
+
+/* Checkbox container styling */
+.checkbox-container {
+    display: flex;
+    align-items: center; /* Aligns the checkbox and label vertically */
+    margin: 10px 0; /* Adds some space around the checkbox container */
+}
+
+/* Adjusts space between the checkbox and the label */
+.checkbox-container input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+/* Footer styling */
+footer {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 0.9em;
+    color: #777; /* Grey color for footer text */
+}

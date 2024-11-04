@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Food Schedule Management</title>
+  <link rel="stylesheet" href="CSS/FSMS_MAIN_style.css">
+</head>
+<body>
+    <h1>Food Schedule Management</h1>
+    <div class="container">
+        <button id="addParticipantBtn">Add Participant</button>
+        <button id="editParticipantBtn" disabled>Edit Participant</button>
+        
+        <div id="searchSection">
+            <input type="text" id="searchBar" placeholder="Search participant...">
+            <select id="participantDropdown"></select>
+        </div>
+        
+        <div id="totalParticipants">Total Participants: 0</div>
+    </div>
+
+    <!-- Add Participant Popup -->
+    <div id="addParticipantPopup" class="popup">
+        <div class="popup-content">
+            <h2>Add Participant</h2>
+            <input type="text" id="addName" placeholder="Name" required><br>
+            <input type="text" id="addMobile" placeholder="Mobile Number" required><br>
+            <input type="text" id="addAddress" placeholder="Address" required><br>
+            <button id="saveParticipantBtn">Save</button>
+            <button id="closeAddPopup">Close</button>
+        </div>
+    </div>
+
+    <!-- Edit Participant Popup -->
+    <div id="editParticipantPopup" class="popup">
+        <div class="popup-content">
+            <h2>Edit Participant</h2>
+            <input type="text" id="editName" placeholder="Name" required><br>
+            <input type="text" id="editMobile" placeholder="Mobile Number" required><br>
+            <input type="text" id="editAddress" placeholder="Address" required><br>
+            <button id="saveChangesBtn">Save Changes</button>
+            <button id="cancelEditPopup">Cancel</button>
+            <button id="deleteParticipantBtn">Delete Participant</button>
+        </div>
+    </div>
+
+  <script src="Scripts/FSMS_MAIN_script.js"></script>
+</body>
+</html>
