@@ -8,16 +8,60 @@
 </head>
 <body>
     <h1>Food Schedule Management</h1>
+    <!-- Settings Icon -->
+    <span class="settings-icon" id="settingsIcon">⚙️</span>
+  
+    <!-- Settings Popup -->
+    <div class="settings-popup" id="settingsPopup">
+        <ul>
+            <li id="importOption">Import</li>
+            <li id="exportOption">Export</li>
+            <li id="storageOption">Storage</li>
+        </ul>
+    </div>
     <div class="container">
-        <button id="addParticipantBtn">Add Participant</button>
-        <button id="editParticipantBtn" disabled>Edit Participant</button>
-        
-        <div id="searchSection">
-            <input type="text" id="searchBar" placeholder="Search participant...">
-            <select id="participantDropdown"></select>
+        <div>
+            <button id="addParticipantBtn">Add Participant</button>
+            <button id="editParticipantBtn" disabled>Edit Participant</button>
+            
+            <div id="searchSection">
+                <input type="text" id="searchBar" placeholder="Search participant...">
+                <select id="participantDropdown"></select>
+            </div>
+            
+            <div id="totalParticipants">Total Participants: 0</div>
         </div>
-        
-        <div id="totalParticipants">Total Participants: 0</div>
+    </div>
+
+    <div id="fsms-container">
+        <!-- Date Field and Buttons -->
+        <div class="date-save-container">
+            <label for="date-field">Date:</label>
+            <input type="date" id="dateField" />
+            <button id="refreshPageBtn">Refresh</button>
+            <button id="savetablebtn">Save Table</button>
+            <button id="resettableBtn">Reset</button>
+        </div>
+    
+        <table id="foodscheduletable">
+            <thead>
+                <tr>
+                    <th>Participant</th>
+                    <th>Breakfast</th>
+                    <th>Quantity</th>
+                    <th>Lunch</th>
+                    <th>Quantity</th>
+                    <th>Dinner</th>
+                    <th>Quantity</th>
+                    <th>Extras</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody id="tablebody">
+                <!-- Rows will be dynamically populated -->
+            </tbody>
+        </table>
+        <button id="savetablebtnbottom">Save Table</button>
     </div>
 
     <!-- Add Participant Popup -->
@@ -46,5 +90,6 @@
     </div>
 
   <script src="Scripts/FSMS_MAIN_script.js"></script>
+  <script src="Scripts/FSMS_TABLE_script.js"></script>
 </body>
 </html>

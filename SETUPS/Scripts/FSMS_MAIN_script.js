@@ -11,20 +11,40 @@ const deleteParticipantBtn = document.getElementById('deleteParticipantBtn');
 const searchBar = document.getElementById('searchBar');
 const participantDropdown = document.getElementById('participantDropdown');
 const totalParticipants = document.getElementById('totalParticipants');
+// Get the refresh button element
+const refreshPageButton = document.getElementById('refreshPageBtn');
 
 let db;
 let participants = []; // Ensure participants array is defined here
 
 // Initialize IndexedDB
 function initDB() {
-    const request = indexedDB.open("FSMS_PARTICIPANTS_DB", 1);
+    const request = indexedDB.open("FSMS_Participants_DB", 1); // Open the database with version 1
+
+    // Handle database upgrade or creation
     request.onupgradeneeded = function(event) {
         db = event.target.result;
-        db.createObjectStore("participants", { keyPath: "id", autoIncrement: true });
+        console.log("onupgradeneeded triggered");
+
+        // Check if the object store exists, if not create it
+        if (!db.objectStoreNames.contains("participants")) {
+            db.createObjectStore("participants", { keyPath: "id", autoIncrement: true });
+            console.log("Object store 'participants' created.");
+        }
     };
+
+    // Handle success
     request.onsuccess = function(event) {
         db = event.target.result;
+        console.log("Database opened successfully");
+        
+        // Load participants after DB is opened
         loadParticipants();
+    };
+
+    // Handle errors
+    request.onerror = function(event) {
+        console.error("Database error: " + event.target.errorCode);
     };
 }
 
@@ -32,10 +52,21 @@ function initDB() {
 function loadParticipants() {
     const transaction = db.transaction("participants", "readonly");
     const store = transaction.objectStore("participants");
-    store.getAll().onsuccess = function(event) {
+
+    // Get all participants from the object store
+    const request = store.getAll();
+    
+    request.onsuccess = function(event) {
         participants = event.target.result || []; // Store participants in array, ensure it's not undefined
+        console.log("Participants loaded:", participants);
+
+        // Update the dropdown and display total participants
         updateDropdown(participants);
         totalParticipants.textContent = `Total Participants: ${participants.length}`;
+    };
+
+    request.onerror = function(event) {
+        console.error("Error loading participants", event.target.errorCode);
     };
 }
 
@@ -141,6 +172,22 @@ function deleteParticipant() {
     }
 }
 
+// JavaScript to toggle the settings popup
+const settingsIcon = document.getElementById('settingsIcon');
+const settingsPopup = document.getElementById('settingsPopup');
+
+settingsIcon.addEventListener('click', () => {
+    // Toggle popup visibility
+    settingsPopup.style.display = settingsPopup.style.display === 'block' ? 'none' : 'block';
+});
+
+// Close the popup if the user clicks outside of it
+document.addEventListener('click', (event) => {
+    if (!settingsIcon.contains(event.target) && !settingsPopup.contains(event.target)) {
+        settingsPopup.style.display = 'none';
+    }
+});
+
 // Event listeners
 addParticipantBtn.onclick = () => addParticipantPopup.style.display = 'block';
 closeAddPopup.onclick = () => addParticipantPopup.style.display = 'none';
@@ -159,5 +206,14 @@ deleteParticipantBtn.onclick = () => {
     editParticipantPopup.style.display = 'none';
 };
 
-// Load DB on page load
-window.onload = initDB;
+// Add an event listener to the refresh button to reload the page
+refreshPageButton.addEventListener('click', () => {
+    location.reload(); // Refreshes the page
+});
+
+// Initialize IndexedDB and object stores on page load
+window.onload = function () {
+    initDB();
+};
+
+
