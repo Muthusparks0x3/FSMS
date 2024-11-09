@@ -13,6 +13,17 @@ const participantDropdown = document.getElementById('participantDropdown');
 const totalParticipants = document.getElementById('totalParticipants');
 // Get the refresh button element
 const refreshPageButton = document.getElementById('refreshPageBtn');
+// JavaScript to toggle the settings popup
+const settingsIcon = document.getElementById('settingsIcon');
+const settingsPopup = document.getElementById('settingsPopup');
+const exportOption = document.getElementById('exportOption');
+const importOption = document.getElementById('importOption');
+const importOPtionsPopup = document.getElementById('importOptionsPopup');
+const exportOptionsPopup = document.getElementById('exportOptionsPopup');
+const exportParticipantDB = document.getElementById('exportParticipants');
+// Select the import option and file input elements
+const importParticipantsDB = document.getElementById("importParticipants");
+const importFileInput = document.getElementById("importFileInput");
 
 let db;
 let participants = []; // Ensure participants array is defined here
@@ -28,7 +39,8 @@ function initDB() {
 
         // Check if the object store exists, if not create it
         if (!db.objectStoreNames.contains("participants")) {
-            db.createObjectStore("participants", { keyPath: "id", autoIncrement: true });
+            const store = db.createObjectStore("participants", { keyPath: "id", autoIncrement: true });
+            store.createIndex("name_mobile", ["name", "mobile"], { unique: true });
             console.log("Object store 'participants' created.");
         }
     };
@@ -47,6 +59,7 @@ function initDB() {
         console.error("Database error: " + event.target.errorCode);
     };
 }
+
 
 // Load participants from IndexedDB
 function loadParticipants() {
@@ -172,9 +185,149 @@ function deleteParticipant() {
     }
 }
 
-// JavaScript to toggle the settings popup
-const settingsIcon = document.getElementById('settingsIcon');
-const settingsPopup = document.getElementById('settingsPopup');
+async function exportParticipantsToCSV() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open("FSMS_Participants_DB", 1);
+
+        request.onsuccess = function(event) {
+            const db = event.target.result;
+            const transaction = db.transaction("participants", "readonly");
+            const store = transaction.objectStore("participants");
+
+            let csvContent = 'data:text/csv;charset=utf-8,';
+            csvContent += 'ID,Name,Mobile,Address\n';
+
+            store.openCursor().onsuccess = function(event) {
+                const cursor = event.target.result;
+                if (cursor) {
+                    const participant = cursor.value;
+                    const id = participant.id || '';
+                    const name = participant.name || '';
+                    const mobile = participant.mobile || '';
+                    const address = participant.address || '';
+
+                    csvContent += `${id},${name},${mobile},${address}\n`;
+
+                    cursor.continue();
+                } else {
+                    // Download the CSV once all participants are processed
+                    const encodedUri = encodeURI(csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", "participants_data.csv");
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+
+                    resolve("CSV exported successfully.");
+                }
+            };
+
+            store.openCursor().onerror = function(event) {
+                reject("Error exporting participants to CSV: " + event.target.errorCode);
+            };
+        };
+
+        request.onerror = function(event) {
+            reject("Error opening database: " + event.target.errorCode);
+        };
+    });
+}
+
+// Handle file selection and import to IndexedDB
+importFileInput.addEventListener("change", function(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const csvData = e.target.result;
+            if (typeof csvData === 'string') {
+                importCSVToIndexedDB(csvData);
+            } else {
+                console.error("File read error: Data is not in string format.");
+            }
+        };
+        reader.readAsText(file);
+    }
+});
+
+// Function to parse CSV data and import it into IndexedDB
+// Function to parse CSV data and import it into IndexedDB
+async function importCSVToIndexedDB(csvData) {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open("FSMS_Participants_DB", 1);
+
+        request.onsuccess = function(event) {
+            const db = event.target.result;
+            const transaction = db.transaction("participants", "readwrite");
+            const store = transaction.objectStore("participants");
+
+            // Split CSV data into rows
+            const rows = csvData.split('\n').filter(row => row.trim() !== '');
+
+            // Extract headers from the first row and normalize them
+            let headers = rows[0].split(',').map(header => header.trim().toLowerCase());
+
+            // Create a mapping based on expected field names
+            const headerMap = {
+                id: "id",
+                name: "name",
+                mobile: "mobile",
+                address: "address"
+            };
+
+            // Process each row (excluding headers)
+            rows.slice(1).forEach(row => {
+                const values = row.split(',').map(value => value.trim());
+
+                // Create a participant object with fields mapped correctly
+                const participant = {
+                    name: values[headers.indexOf(headerMap.name)] || '',
+                    mobile: values[headers.indexOf(headerMap.mobile)] || '',
+                    address: values[headers.indexOf(headerMap.address)] || ''
+                };
+
+                // Check for existing entry with the same name and mobile number
+                const index = store.index("name_mobile"); // Assuming you have a compound index on name and mobile
+                const searchKey = [participant.name, participant.mobile];
+                const getRequest = index.getKey(searchKey);
+
+                getRequest.onsuccess = function() {
+                    const existingId = getRequest.result;
+
+                    // If existing record is found, delete it
+                    if (existingId !== undefined) {
+                        store.delete(existingId);
+                    }
+
+                    // Add the new participant record
+                    store.add(participant);
+                };
+
+                getRequest.onerror = function(event) {
+                    console.error("Error checking for existing entry:", event.target.errorCode);
+                };
+            });
+
+            transaction.oncomplete = () => {
+                console.log("CSV data imported successfully to IndexedDB.");
+                resolve();
+            };
+            
+            transaction.onerror = (event) => {
+                console.error("Error importing CSV to IndexedDB:", event.target.errorCode);
+                reject(event.target.errorCode);
+            };
+        };
+
+        request.onerror = function(event) {
+            console.error("Error opening database for import:", event.target.errorCode);
+            reject(event.target.errorCode);
+        };
+    });
+}
+
+
 
 settingsIcon.addEventListener('click', () => {
     // Toggle popup visibility
@@ -186,6 +339,49 @@ document.addEventListener('click', (event) => {
     if (!settingsIcon.contains(event.target) && !settingsPopup.contains(event.target)) {
         settingsPopup.style.display = 'none';
     }
+});
+
+// Show export options when "Export" is clicked
+exportOption.addEventListener('click', (event) => {
+    // Position exportOptionsPopup directly below the "Export" option
+    const exportOptionRect = exportOption.getBoundingClientRect();
+    exportOptionsPopup.style.top = `${exportOptionRect.bottom + window.scrollY}px`;
+    exportOptionsPopup.style.left = `${exportOptionRect.left + window.scrollX}px`;
+    
+    // Toggle export options visibility
+    exportOptionsPopup.style.display = exportOptionsPopup.style.display === 'block' ? 'none' : 'block';
+});
+
+// Toggle display for Import popups
+importOption.addEventListener('click', (event) => {
+    // Position exportOptionsPopup directly below the "Export" option
+    const importOptionRect = importOption.getBoundingClientRect();
+    importOPtionsPopup.style.top = `${importOptionRect.bottom + window.scrollY}px`;
+    importOPtionsPopup.style.left = `${importOptionRect.left + window.scrollX}px`;
+    
+    // Toggle export options visibility
+    importOPtionsPopup.style.display = exportOptionsPopup.style.display === 'block' ? 'none' : 'block';
+});
+
+// Hide both popups when clicking outside
+document.addEventListener('click', (event) => {
+    if (!settingsPopup.contains(event.target) && event.target !== settingsIcon) {
+        settingsPopup.style.display = 'none';
+    }
+    if (!exportOptionsPopup.contains(event.target) && event.target !== exportOption) {
+        exportOptionsPopup.style.display = 'none';
+    }
+    if (!importOPtionsPopup.contains(event.target) && event.target !== importOption){
+        importOPtionsPopup.style.display ='none';
+    }
+});
+
+//Exporting the Participant DB to CSV file
+exportParticipantDB.addEventListener('click',exportParticipantsToCSV);
+
+// Add event listener to trigger the file input dialog when "Participants" is clicked
+importParticipantsDB.addEventListener("click", () => {
+    importFileInput.click(); // Opens the file dialog
 });
 
 // Event listeners

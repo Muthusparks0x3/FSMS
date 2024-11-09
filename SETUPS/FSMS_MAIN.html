@@ -19,6 +19,22 @@
             <li id="storageOption">Storage</li>
         </ul>
     </div>
+
+    <!-- Export Options Popup -->
+    <div class="export-options-popup" id="exportOptionsPopup">
+        <ul>
+            <li id="exportParticipants">Participants</li>
+            <li id="exportSchedule">Schedule</li>
+        </ul>
+    </div>
+
+    <!-- Import Options Popup (similar structure to Export) -->
+    <div class="import-options-popup" id="importOptionsPopup">
+        <ul>
+            <li id="importParticipants">Participants</li>
+            <li id="importSchedule">Schedule</li>
+        </ul>
+    </div>
     <div class="container">
         <div>
             <button id="addParticipantBtn">Add Participant</button>
@@ -88,6 +104,9 @@
             <button id="deleteParticipantBtn">Delete Participant</button>
         </div>
     </div>
+
+    <!-- Hidden file input for CSV import -->
+    <input type="file" id="importFileInput" accept=".csv" style="display: none;">
 
   <script src="Scripts/FSMS_MAIN_script.js"></script>
   <script src="Scripts/FSMS_TABLE_script.js"></script>
