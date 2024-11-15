@@ -6,6 +6,8 @@ const saveTableButton = document.getElementById('savetablebtn');
 const savetablebtnbottom = document.getElementById('savetablebtnbottom')
 const resetTableButton = document.getElementById('resettableBtn');
 const exportScheduleDB = document.getElementById('exportSchedule')
+const importScheduleDB = document.getElementById("importSchedule");
+const importScheduleFileInput = document.getElementById("foodScheduleFileInput");
 
 // Function to retrieve participants from FSMS_Participant_DB
 async function getParticipants() {
@@ -18,14 +20,19 @@ async function getParticipants() {
             const allParticipants = store.getAll();
 
             allParticipants.onsuccess = () => {
-                resolve(allParticipants.result);
+                // Map each participant to an object with both name and participantID
+                const participants = allParticipants.result.map(participant => ({
+                    name: participant.name,
+                    participantID: participant.participantID
+                }));
+                resolve(participants);
             };
             allParticipants.onerror = () => {
                 reject('Failed to retrieve participants.');
             };
         };
         request.onerror = () => {
-            reject('Failed to open FSMS_Participant_DB.');
+            reject('Failed to open FSMS_Participants_DB.');
         };
     });
 }
@@ -82,8 +89,9 @@ function initIndexedDB(date) {
 
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
+
             if (!db.objectStoreNames.contains(monthStore)) {
-                db.createObjectStore(monthStore, { keyPath: 'date' });
+                const store = db.createObjectStore(monthStore, { keyPath: 'date' });
                 console.log(`Object store for ${monthStore} created.`);
             }
         };
@@ -108,33 +116,55 @@ async function saveTableDataToIndexedDB() {
         return;
     }
 
-    const rowsData = Array.from(tableBody.rows).map(row => ({
-        participant: row.cells[0].innerText,
-        breakfast: row.cells[1].querySelector('input').checked,
-        breakfastQuantity: row.cells[2].querySelector('input').value,
-        lunch: row.cells[3].querySelector('input').checked,
-        lunchQuantity: row.cells[4].querySelector('input').value,
-        dinner: row.cells[5].querySelector('input').checked,
-        dinnerQuantity: row.cells[6].querySelector('input').value,
-        extras: row.cells[7].querySelector('input').value,
-        details: row.cells[8].querySelector('input').value,
-    }));
+    // Fetch participants with their IDs
+    const participants = await getParticipants();
+
+    const rowsData = Array.from(tableBody.rows).map(row => {
+        const participantName = row.cells[0].innerText;
+        // Find the participant ID for the current row's participant
+        const participant = participants.find(p => p.name === participantName);
+        if (!participant) {
+            console.error(`Participant ID not found for ${participantName}`);
+            return null; // If participant not found, skip this row
+        }
+
+        return {
+            participantID: participant.participantID, // Store the participantID
+            participant: participantName, // Store the participant name
+            breakfast: row.cells[1].querySelector('input').checked,
+            breakfastQuantity: row.cells[2].querySelector('input').value,
+            lunch: row.cells[3].querySelector('input').checked,
+            lunchQuantity: row.cells[4].querySelector('input').value,
+            dinner: row.cells[5].querySelector('input').checked,
+            dinnerQuantity: row.cells[6].querySelector('input').value,
+            extras: row.cells[7].querySelector('input').value,
+            details: row.cells[8].querySelector('input').value,
+        };
+    }).filter(row => row !== null); // Filter out any rows where participantID was not found
+
+    if (rowsData.length === 0) {
+        alert('No valid rows to save.');
+        return;
+    }
 
     const monthStore = new Date(date).toLocaleString('default', { month: 'long' });
-    
+
     try {
         const db = await initIndexedDB(date);
 
         const transaction = db.transaction(monthStore, 'readwrite');
         const store = transaction.objectStore(monthStore);
+
+        // Save the rowsData into the store
         store.put({ date, rowsData });
 
         transaction.oncomplete = () => {
+            console.log('Transaction completed. Data has been stored.');
             alert('Table data saved.');
         };
-        
-        transaction.onerror = () => {
-            console.error('Error saving data to IndexedDB.');
+
+        transaction.onerror = (e) => {
+            console.error('Error saving data to IndexedDB.', e);
         };
     } catch (error) {
         console.error('Failed to save table data:', error);
@@ -204,10 +234,9 @@ function populateTableWithData(rowsData) {
 
 // Export and reset function
 // Function to open the schedule database
-// Function to open the schedule database
 async function openScheduleDB() {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open('FSMS_Schedule_Details_DB', 1);
+        const request = indexedDB.open('FSMS_Schedule_Details_DB', dbVersion);
         
         request.onsuccess = (event) => {
             const db = event.target.result;
@@ -228,14 +257,12 @@ async function openScheduleDB() {
 }
 
 //Export the schedule details DB data to csv file 
-async function exportScheduleToCSV() {
+async function exportScheduleToCSV(monthStoreName) {
     return new Promise((resolve, reject) => {
         const dbName = "FSMS_Schedule_Details_DB";
-        const date = new Date();
-        const monthStoreName = date.toLocaleString('default', { month: 'long' });
         const fileName = `Food_schedule_${monthStoreName}.csv`;
 
-        const request = indexedDB.open(dbName, 1);
+        const request = indexedDB.open(dbName, dbVersion);
 
         request.onsuccess = function(event) {
             const db = event.target.result;
@@ -250,7 +277,7 @@ async function exportScheduleToCSV() {
             const store = transaction.objectStore(monthStoreName);
 
             let csvContent = 'data:text/csv;charset=utf-8,';
-            csvContent += 'Date,Participant,Breakfast,Breakfast Qty,Lunch,Lunch Qty,Dinner,Dinner Qty,Extras,Details\n';
+            csvContent += 'Date,participantID,Participant,Breakfast,Breakfast Qty,Lunch,Lunch Qty,Dinner,Dinner Qty,Extras,Details\n';
 
             store.openCursor().onsuccess = function(event) {
                 const cursor = event.target.result;
@@ -259,6 +286,7 @@ async function exportScheduleToCSV() {
                     const date = entry.date || '';
 
                     entry.rowsData.forEach((data) => {
+                        const participantID = data.participantID || '';  // Include the participantID
                         const participant = data.participant || '';
                         const breakfast = data.breakfast ? 'Yes' : 'No';
                         const breakfastQuantity = data.breakfastQuantity || 0;
@@ -269,7 +297,7 @@ async function exportScheduleToCSV() {
                         const extras = data.extras || 0;
                         const details = data.details || '';
 
-                        csvContent += `${date},${participant},${breakfast},${breakfastQuantity},${lunch},${lunchQuantity},${dinner},${dinnerQuantity},${extras},${details}\n`;
+                        csvContent += `${date},${participantID},${participant},${breakfast},${breakfastQuantity},${lunch},${lunchQuantity},${dinner},${dinnerQuantity},${extras},${details}\n`;
                     });
 
                     cursor.continue();
@@ -300,46 +328,201 @@ async function exportScheduleToCSV() {
 
 // Function to reset data: export and then delete
 async function resetTableData() {
-    const date = dateField.value;
-    const monthStoreName = new Date(date).toLocaleString('default', { month: 'long' });
-    const db = await openScheduleDB().catch((error) => {
-        console.error('Error in opening database for reset:', error);
-        alert('Error in opening database for reset.');
-    });
+    const date = new Date(dateField.value || new Date());
+    const currentMonthStoreName = date.toLocaleString('default', { month: 'long' });
 
-    if (!db) return; // Stop if db is undefined
+    // Get the previous month
+    let previousMonthDate = new Date(date);
+    previousMonthDate.setMonth(date.getMonth() - 1);
+    const previousMonthStoreName = previousMonthDate.toLocaleString('default', { month: 'long' });
 
-    if (!checkObjectStoreExists(db, monthStoreName)) {
-        console.error(`Object store ${monthStoreName} does not exist.`);
-        alert(`Object store ${monthStoreName} does not exist. Reset aborted.`);
-        return;
-    }
+    // Open the database to get the current version
+    const dbRequest = indexedDB.open("FSMS_Schedule_Details_DB");
 
-    try {
-        // Export data to CSV
-        await exportScheduleToCSV(monthStoreName, db);
+    dbRequest.onsuccess = async function(event) {
+        const currentDB = event.target.result;
+        const currentVersion = currentDB.version;
+        currentDB.close();
 
-        // Delete the object store data after export
-        const deleteTransaction = db.transaction(monthStoreName, 'readwrite');
-        const deleteStore = deleteTransaction.objectStore(monthStoreName);
+        // Export data of the previous month to CSV before deleting the object store
+        try {
+            await exportScheduleToCSV(previousMonthStoreName);
+            console.log(`Data for ${previousMonthStoreName} exported to CSV.`);
+        } catch (error) {
+            console.error('Failed to export data:', error);
+            alert('Failed to export data. Reset aborted.');
+            return;
+        }
 
-        deleteStore.clear().onsuccess = () => {
-            console.log(`Cleared ${monthStoreName} store from IndexedDB.`);
-            alert('Table data exported and reset.');
+        // Reopen the database with an incremented version to delete the object store
+        const upgradeRequest = indexedDB.open("FSMS_Schedule_Details_DB", currentVersion + 1);
 
-            // Clear the table rows from the page
+        upgradeRequest.onupgradeneeded = function(event) {
+            const db = event.target.result;
+
+            // Delete the previous month's object store
+            if (db.objectStoreNames.contains(previousMonthStoreName)) {
+                db.deleteObjectStore(previousMonthStoreName);
+                console.log(`Deleted ${previousMonthStoreName} object store from IndexedDB.`);
+            } else {
+                console.log(`Object store ${previousMonthStoreName} does not exist. Nothing to reset.`);
+            }
+        };
+
+        upgradeRequest.onsuccess = function() {
+            console.log(`Database version upgraded. ${previousMonthStoreName} object store deleted.`);
+            alert(`Previous month's (${previousMonthStoreName}) data exported and reset.`);
+            // Clear the table rows from the page if needed
             tableBody.innerHTML = '';
         };
 
-        deleteTransaction.onerror = () => {
-            console.error(`Failed to clear ${monthStoreName} store from IndexedDB.`);
+        upgradeRequest.onerror = function(event) {
+            console.error("Failed to upgrade database and delete object store:", event.target.error);
+            alert("Failed to reset database. Please try again.");
+        };
+    };
+
+    dbRequest.onerror = function(event) {
+        console.error("Error opening database for version check:", event.target.errorCode);
+        alert("Failed to open database for reset.");
+    };
+}
+
+
+// Function to check if an object store exists in the database
+function checkObjectStoreExists(db, storeName) {
+    return db.objectStoreNames.contains(storeName);
+}
+
+// Handle file selection and import schedule data to IndexedDB
+importScheduleFileInput.addEventListener("change", function(event) {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const csvData = e.target.result;
+            if (typeof csvData === 'string') {
+                importCSVToScheduleDB(csvData);
+            } else {
+                console.error("File read error: Data is not in string format.");
+            }
+        };
+        reader.readAsText(file);
+    }
+});
+
+//Import schedule details into DB function
+async function importCSVToScheduleDB(csvData) {
+    return new Promise((resolve, reject) => {
+        const dbName = "FSMS_Schedule_Details_DB";
+        const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+
+        const request = indexedDB.open(dbName, dbVersion);
+
+        request.onupgradeneeded = function(event) {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(currentMonth)) {
+                db.createObjectStore(currentMonth, { keyPath: 'date' });
+            }
         };
 
-    } catch (error) {
-        console.error(error);
-        alert('Failed to export data. Reset aborted.');
-    }
+        request.onsuccess = function(event) {
+            const db = event.target.result;
+            const transaction = db.transaction(currentMonth, "readwrite");
+            const store = transaction.objectStore(currentMonth);
+
+            // Split CSV data into rows and extract headers
+            const rows = csvData.split('\n').filter(row => row.trim() !== '');
+            const headers = rows[0].split(',').map(header => header.trim().toLowerCase());
+
+            // Map headers to your expected object keys
+            const headerMap = {
+                date: "date",
+                "participant id": "participantID",  // Correct mapping for participant ID
+                participant: "participant",
+                breakfast: "breakfast",
+                "breakfast qty": "breakfastQuantity",
+                lunch: "lunch",
+                "lunch qty": "lunchQuantity",
+                dinner: "dinner",
+                "dinner qty": "dinnerQuantity",
+                extras: "extras",
+                details: "details"
+            };
+
+            // Prepare a dictionary to store rows by date
+            const scheduleByDate = {};
+
+            // Process each row (excluding headers)
+            rows.slice(1).forEach(row => {
+                const values = row.split(',').map(value => value.trim());
+
+                // Map CSV row to the expected format
+                const entry = {
+                    participantID: values[headers.indexOf("participant id")] || '',  // Ensure participantID is correctly extracted
+                    participant: values[headers.indexOf("participant")] || '',
+                    breakfast: values[headers.indexOf("breakfast")].toLowerCase() === 'yes',
+                    breakfastQuantity: values[headers.indexOf("breakfast qty")] || '0',
+                    lunch: values[headers.indexOf("lunch")].toLowerCase() === 'yes',
+                    lunchQuantity: values[headers.indexOf("lunch qty")] || '0',
+                    dinner: values[headers.indexOf("dinner")].toLowerCase() === 'yes',
+                    dinnerQuantity: values[headers.indexOf("dinner qty")] || '0',
+                    extras: values[headers.indexOf("extras")] || '0',
+                    details: values[headers.indexOf("details")] || ''
+                };
+
+                const date = values[headers.indexOf("date")] || '';
+                
+                // Group entries by date
+                if (date) {
+                    if (!scheduleByDate[date]) {
+                        scheduleByDate[date] = [];
+                    }
+                    scheduleByDate[date].push(entry);
+                }
+            });
+
+            // Store each date with its associated rowsData array
+            for (const [date, rowsData] of Object.entries(scheduleByDate)) {
+                store.put({ date, rowsData });
+            }
+
+            transaction.oncomplete = () => {
+                console.log("CSV schedule data imported successfully to IndexedDB.");
+                resolve();
+            };
+            
+            transaction.onerror = (event) => {
+                console.error("Error importing schedule CSV to IndexedDB:", event.target.errorCode);
+                reject(event.target.errorCode);
+            };
+        };
+
+        request.onerror = function(event) {
+            console.error("Error opening database for schedule import:", event.target.errorCode);
+            reject(event.target.errorCode);
+        };
+    });
 }
+
+// Add event listener to trigger the file input dialog when "Import Schedule" is clicked
+importScheduleDB.addEventListener("click", () => {
+    importScheduleFileInput.click(); // Opens the file dialog
+});
+
+// export schedule of current month from submenu of export
+exportScheduleDB.addEventListener('click', async () => {
+    const date = new Date(dateField.value || new Date());
+    const currentMonthStoreName = date.toLocaleString('default', { month: 'long' });
+
+    try {
+        await exportScheduleToCSV(currentMonthStoreName);
+        alert(`Current month's (${currentMonthStoreName}) data exported successfully.`);
+    } catch (error) {
+        console.error('Error exporting current month schedule:', error);
+        alert('Failed to export current month schedule.');
+    }
+});
 
 // Event Listeners
 dateField.addEventListener('change', () => {
@@ -349,5 +532,4 @@ dateField.addEventListener('change', () => {
 saveTableButton.addEventListener('click', saveTableDataToIndexedDB);
 savetablebtnbottom.addEventListener('click',saveTableDataToIndexedDB)
 resetTableButton.addEventListener('click', resetTableData);
-exportScheduleDB.addEventListener('click',exportScheduleToCSV);
 

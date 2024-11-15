@@ -1,3 +1,10 @@
+/* Basic reset for margins and paddings */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 /* General body styling */
 body {
     font-family: Arial, sans-serif;
@@ -47,6 +54,15 @@ button:hover {
 /* Search section styling */
 #searchSection {
     margin: 15px;
+    font-size: 1em;
+}
+
+#searchBar{
+    width: 80%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #d1d1d1; /* Lighter gray border */
+    border-radius: 5px;
     font-size: 1em;
 }
 
@@ -145,9 +161,9 @@ button:hover {
 }
 
 #foodscheduletable th, #foodscheduletable td {
-    border: 1px solid #ddd;
     padding: 8px;
     text-align: center;
+    border: 1.5px solid #888; /* Bolder border */
 }
 
 #dateField {
@@ -159,9 +175,9 @@ button:hover {
 .settings-icon {
     font-size: 20px;
     cursor: pointer;
-    position: fixed;
-    top: 10px;
-    right: 10px;
+    position: absolute;
+    top: 25px;
+    right: 120px;
     z-index: 100;
 }
 
@@ -216,4 +232,23 @@ button:hover {
 .export-options-popup ul li, .import-options-popup ul li {
     padding: 5px 10px;
     cursor: pointer;
+}
+
+#logoutButton {
+    padding: 8px 16px;
+    cursor: pointer;
+    position: absolute;
+    top: 10px;  /* Adjust as needed */
+    right: 10px; /* Adjust as needed */
+    padding: 10px 20px;
+    background-color: #f44336;
+    color: white;
+}
+
+/* Footer styles */
+footer {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 0.9em;
+    color: #777;
 }

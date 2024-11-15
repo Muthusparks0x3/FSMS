@@ -11,6 +11,7 @@ const deleteParticipantBtn = document.getElementById('deleteParticipantBtn');
 const searchBar = document.getElementById('searchBar');
 const participantDropdown = document.getElementById('participantDropdown');
 const totalParticipants = document.getElementById('totalParticipants');
+const logoutbutton =  document.getElementById("logoutButton")
 // Get the refresh button element
 const refreshPageButton = document.getElementById('refreshPageBtn');
 // JavaScript to toggle the settings popup
@@ -24,6 +25,8 @@ const exportParticipantDB = document.getElementById('exportParticipants');
 // Select the import option and file input elements
 const importParticipantsDB = document.getElementById("importParticipants");
 const importFileInput = document.getElementById("importFileInput");
+//Export page button
+const ExportPage = document.getElementById("Exportpage");
 
 let db;
 let participants = []; // Ensure participants array is defined here
@@ -40,7 +43,7 @@ function initDB() {
         // Check if the object store exists, if not create it
         if (!db.objectStoreNames.contains("participants")) {
             const store = db.createObjectStore("participants", { keyPath: "id", autoIncrement: true });
-            store.createIndex("name_mobile", ["name", "mobile"], { unique: true });
+            store.createIndex("name_id", ["name", "participantID"], { unique: true });
             console.log("Object store 'participants' created.");
         }
     };
@@ -59,7 +62,6 @@ function initDB() {
         console.error("Database error: " + event.target.errorCode);
     };
 }
-
 
 // Load participants from IndexedDB
 function loadParticipants() {
@@ -83,21 +85,70 @@ function loadParticipants() {
     };
 }
 
+// Function to generate a unique participantID starting from 100
+function generateParticipantID(callback) {
+    const transaction = db.transaction("participants", "readonly");
+    const store = transaction.objectStore("participants");
+
+    let lastParticipantID = 99; // Start with 99, so the first ID generated is 100
+
+    // Open a cursor to iterate through records and find the highest participantID
+    store.openCursor().onsuccess = function(event) {
+        const cursor = event.target.result;
+        if (cursor) {
+            const participantID = parseInt(cursor.value.participantID, 10); // Ensure it's treated as an integer
+            if (!isNaN(participantID) && participantID > lastParticipantID) {
+                lastParticipantID = participantID;
+            }
+            cursor.continue();
+        } else {
+            // Once iteration is complete, generate the new participantID
+            const newParticipantID = lastParticipantID + 1;
+            callback(newParticipantID);
+        }
+    };
+
+    transaction.onerror = function(event) {
+        console.error("Error generating participantID:", event.target.errorCode);
+        callback(null); // Return null in case of error
+    };
+}
+
 // Add participant
-function addParticipant() {
+function addParticipant() { 
     const name = document.getElementById('addName').value;
     const mobile = document.getElementById('addMobile').value;
     const address = document.getElementById('addAddress').value;
+
     if (name && mobile && address) {
-        const transaction = db.transaction("participants", "readwrite");
-        transaction.objectStore("participants").add({ name, mobile, address });
-        transaction.oncomplete = () => {
-            alert("Participant added successfully!"); // Success message
-            loadParticipants();
-            clearAddParticipantFields();
-        };
-    }
-    else {
+        // Generate a new participantID and add participant once generated
+        generateParticipantID(function(newParticipantID) {
+            if (newParticipantID !== null) {
+                const transaction = db.transaction("participants", "readwrite");
+                const store = transaction.objectStore("participants");
+
+                // Add participant with new participantID
+                store.add({
+                    participantID: newParticipantID,  // Store auto-incremented participantID
+                    name: name,
+                    mobile: mobile,
+                    address: address
+                });
+
+                transaction.oncomplete = () => {
+                    alert("Participant added successfully!");
+                    loadParticipants();
+                    clearAddParticipantFields();
+                };
+
+                transaction.onerror = (event) => {
+                    console.error("Error adding participant:", event.target.errorCode);
+                };
+            } else {
+                alert("Error generating participant ID.");
+            }
+        });
+    } else {
         alert("All fields are required.");
     }
 }
@@ -195,18 +246,19 @@ async function exportParticipantsToCSV() {
             const store = transaction.objectStore("participants");
 
             let csvContent = 'data:text/csv;charset=utf-8,';
-            csvContent += 'ID,Name,Mobile,Address\n';
+            csvContent += 'ID,ParticipantID,Name,Mobile,Address\n';
 
             store.openCursor().onsuccess = function(event) {
                 const cursor = event.target.result;
                 if (cursor) {
                     const participant = cursor.value;
                     const id = participant.id || '';
+                    const participantID = participant.participantID || ''; // Include participantID
                     const name = participant.name || '';
                     const mobile = participant.mobile || '';
                     const address = participant.address || '';
 
-                    csvContent += `${id},${name},${mobile},${address}\n`;
+                    csvContent += `${id},${participantID},${name},${mobile},${address}\n`;
 
                     cursor.continue();
                 } else {
@@ -214,7 +266,7 @@ async function exportParticipantsToCSV() {
                     const encodedUri = encodeURI(csvContent);
                     const link = document.createElement("a");
                     link.setAttribute("href", encodedUri);
-                    link.setAttribute("download", "participants_data.csv");
+                    link.setAttribute("download", "FSMS_Participants_data.csv");
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
@@ -234,6 +286,7 @@ async function exportParticipantsToCSV() {
     });
 }
 
+
 // Handle file selection and import to IndexedDB
 importFileInput.addEventListener("change", function(event) {
     const file = event.target.files[0];
@@ -252,82 +305,93 @@ importFileInput.addEventListener("change", function(event) {
 });
 
 // Function to parse CSV data and import it into IndexedDB
-// Function to parse CSV data and import it into IndexedDB
-async function importCSVToIndexedDB(csvData) {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open("FSMS_Participants_DB", 1);
+function importCSVToIndexedDB(csvData) {
+    const transaction = db.transaction("participants", "readwrite");
+    const store = transaction.objectStore("participants");
+    const index = store.index("name_id"); // Index based on name and participantID
 
-        request.onsuccess = function(event) {
-            const db = event.target.result;
-            const transaction = db.transaction("participants", "readwrite");
-            const store = transaction.objectStore("participants");
+    const rows = csvData.split('\n').filter(row => row.trim() !== '');
+    const headers = rows[0].split(',').map(header => header.trim().toLowerCase());
 
-            // Split CSV data into rows
-            const rows = csvData.split('\n').filter(row => row.trim() !== '');
+    const headerMap = {
+        participantid: "ParticipantID",
+        name: "name",
+        mobile: "mobile" ,  
+        address: "address"
+    };
 
-            // Extract headers from the first row and normalize them
-            let headers = rows[0].split(',').map(header => header.trim().toLowerCase());
+    // Check if the participantID column exists in the CSV file
+    const participantIDIndex = headers.findIndex(header => header === headerMap.participantid.toLowerCase());
+    if (participantIDIndex === -1) {
+        console.error("participantID column is missing in CSV headers.");
+        return;
+    }
 
-            // Create a mapping based on expected field names
-            const headerMap = {
-                id: "id",
-                name: "name",
-                mobile: "mobile",
-                address: "address"
+    let highestParticipantID = 0; // Initialize highest participant ID
+
+    // Fetch all existing participants to determine the highest participantID
+    const getAllRequest = store.getAll();
+    getAllRequest.onsuccess = function() {
+        const participants = getAllRequest.result;
+        participants.forEach(participant => {
+            if (participant.participantID > highestParticipantID) {
+                highestParticipantID = participant.participantID;
+            }
+        });
+
+        // Now, process the CSV rows
+        rows.slice(1).forEach(row => {
+            const values = row.split(',').map(value => value.trim());
+
+            let participant = {
+                participantID: values[participantIDIndex] || (highestParticipantID + 1), // Default to highestParticipantID + 1 if missing
+                name: values[headers.indexOf(headerMap.name)] || '',
+                mobile: values[headers.indexOf(headerMap.mobile)] || '',
+                address: values[headers.indexOf(headerMap.address)] || ''
             };
 
-            // Process each row (excluding headers)
-            rows.slice(1).forEach(row => {
-                const values = row.split(',').map(value => value.trim());
+            // Check if the participantID from CSV already exists for a different participant
+            const searchKey = [participant.name, participant.participantID];
+            const getRequest = index.get(searchKey);
 
-                // Create a participant object with fields mapped correctly
-                const participant = {
-                    name: values[headers.indexOf(headerMap.name)] || '',
-                    mobile: values[headers.indexOf(headerMap.mobile)] || '',
-                    address: values[headers.indexOf(headerMap.address)] || ''
-                };
+            getRequest.onsuccess = function(event) {
+                const existingEntry = event.target.result;
 
-                // Check for existing entry with the same name and mobile number
-                const index = store.index("name_mobile"); // Assuming you have a compound index on name and mobile
-                const searchKey = [participant.name, participant.mobile];
-                const getRequest = index.getKey(searchKey);
-
-                getRequest.onsuccess = function() {
-                    const existingId = getRequest.result;
-
-                    // If existing record is found, delete it
-                    if (existingId !== undefined) {
-                        store.delete(existingId);
+                if (existingEntry) {
+                    // Scenario 1: If participantID exists but is for a different participant, update the ID
+                    if (existingEntry.participantID !== participant.participantID) {
+                        // Change the participant ID to the next available ID (highest + 1)
+                        participant.participantID = highestParticipantID + 1;
+                        highestParticipantID = participant.participantID; // Update highest ID
                     }
 
-                    // Add the new participant record
+                    // Proceed to add or update the participant
+                    store.put(participant);
+                } else {
+                    // No existing participant found, so just add the new one
                     store.add(participant);
-                };
-
-                getRequest.onerror = function(event) {
-                    console.error("Error checking for existing entry:", event.target.errorCode);
-                };
-            });
-
-            transaction.oncomplete = () => {
-                console.log("CSV data imported successfully to IndexedDB.");
-                resolve();
+                }
             };
-            
-            transaction.onerror = (event) => {
-                console.error("Error importing CSV to IndexedDB:", event.target.errorCode);
-                reject(event.target.errorCode);
-            };
-        };
 
-        request.onerror = function(event) {
-            console.error("Error opening database for import:", event.target.errorCode);
-            reject(event.target.errorCode);
-        };
-    });
+            getRequest.onerror = function(event) {
+                console.error("Error accessing index to verify participant:", event.target.errorCode);
+            };
+        });
+    };
+
+    getAllRequest.onerror = function(event) {
+        console.error("Error fetching participants from IndexedDB:", event.target.errorCode);
+    };
+
+    transaction.oncomplete = () => {
+        console.log("CSV data imported successfully to IndexedDB.");
+        loadParticipants(); // Reload participants to reflect new data
+    };
+
+    transaction.onerror = (event) => {
+        console.error("Error importing CSV to IndexedDB:", event.target.errorCode);
+    };
 }
-
-
 
 settingsIcon.addEventListener('click', () => {
     // Toggle popup visibility
@@ -405,6 +469,18 @@ deleteParticipantBtn.onclick = () => {
 // Add an event listener to the refresh button to reload the page
 refreshPageButton.addEventListener('click', () => {
     location.reload(); // Refreshes the page
+});
+
+//Navigation to export page
+ExportPage.addEventListener('click', function(){ // Redirect to the login page
+window.location.href = 'FSMS_EXPORT.html';
+});
+
+// Event listener for Logout button
+logoutbutton.addEventListener("click", () => {
+    // Add functionality for Logout button
+    alert("Logging out...");
+    window.location.href = "FSMS_LOGIN.html"; // Redirect to the login page
 });
 
 // Initialize IndexedDB and object stores on page load

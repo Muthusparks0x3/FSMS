@@ -4,13 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Food Schedule Management</title>
+  <link rel="icon" href="Icons/Service_icon.png" type="image/png">
   <link rel="stylesheet" href="CSS/FSMS_MAIN_style.css">
 </head>
 <body>
-    <h1>Food Schedule Management</h1>
-    <!-- Settings Icon -->
-    <span class="settings-icon" id="settingsIcon">⚙️</span>
-  
+    <h1>Food Schedule Management System</h1>
+
+    <!-- Logout Button -->
+    <button id="logoutButton" class="top-right-button">Logout</button>
+    <!-- Settings icon -->
+    <span class="settings-icon" id="settingsIcon">⚙️</span>    
     <!-- Settings Popup -->
     <div class="settings-popup" id="settingsPopup">
         <ul>
@@ -56,6 +59,7 @@
             <input type="date" id="dateField" />
             <button id="refreshPageBtn">Refresh</button>
             <button id="savetablebtn">Save Table</button>
+            <button id="Exportpage">Export</button>
             <button id="resettableBtn">Reset</button>
         </div>
     
@@ -107,8 +111,16 @@
 
     <!-- Hidden file input for CSV import -->
     <input type="file" id="importFileInput" accept=".csv" style="display: none;">
+    <!-- Hiiden file to import schedule -->
+    <input type="file" id="foodScheduleFileInput" accept=".csv" style="display: none;">
 
   <script src="Scripts/FSMS_MAIN_script.js"></script>
   <script src="Scripts/FSMS_TABLE_script.js"></script>
 </body>
+<!-- Footer section -->
+<footer>
+    <p>Developed by Helix</p>
+    <p>Any queries and project work Contact me: muthulakshmananchellappan@gmail.com</p>
+    <p>&copy; Copyrights 2024 -- Service Management Application</p>
+</footer>
 </html>

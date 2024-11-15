@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export Page</title>
+    <link rel="icon" href="Icons/Export_icon.png" type="image/png">
+    <link rel="stylesheet" href="CSS/FSMS_EXPORT_style.css">
+</head>
+<body>
+    <h1>Food Schedule Export</h1>
+
+    <!-- Schedule Button -->
+    <button id="scheduleButton" class="top-left-button">Schedule</button>
+    <!-- Logout Button -->
+    <button id="logoutButton" class="top-right-button">Logout</button>
+    <!-- Settings icon -->
+    <span class="settings-icon" id="settingsIcon">⚙️</span>
+    <!-- Settings Popup -->
+    <div class="settings-popup" id="settingsPopup">
+        <ul>
+            <li id="changeAmountOption">Change Amount</li>
+        </ul>
+    </div>
+
+    <!-- Change Amount Popup -->
+    <div class="change-amount-popup" id="changeAmountPopup">
+        <h3>Change Amount</h3>
+        <div class="amount-input">
+            <label for="breakfastAmount">Breakfast:</label>
+            <input type="text" id="breakfastAmount" placeholder="Enter amount">
+        </div>
+        <div class="amount-input">
+            <label for="lunchAmount">Lunch:</label>
+            <input type="text" id="lunchAmount" placeholder="Enter amount">
+        </div>
+        <div class="amount-input">
+            <label for="dinnerAmount">Dinner:</label>
+            <input type="text" id="dinnerAmount" placeholder="Enter amount">
+        </div>
+        <div class="popup-buttons">
+            <button id="updateAmount">Update</button>
+            <button id="cancelAmount">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Main container -->
+    <div class="main-container">
+        <!-- Left container with search, dropdown, and buttons -->
+        <div class="left-container">
+            <input type="text" id="search-bar" placeholder="Search by Name" onkeyup="searchParticipants()">
+            <div class="dropdown-container">
+                <select id="participant-dropdown"></select>
+                <select id="month-dropdown"></select>
+            </div>
+            <div class="buttons">
+                <button id="export-excel">Export Excel</button>
+                <button id="generate">Generate</button> <!-- New Generate button -->
+                <button id="export-pdf">Export PDF</button>
+            </div>
+        </div>
+
+        <!-- Right container for participant details -->
+        <div class="right-container">
+            <h3>Participant Details</h3>
+            <div id="participant-details">
+                <!-- Participant details will be displayed here -->
+            </div>
+        </div>
+    </div>
+    <div class="meal-table">
+        <table id="meal-schedule">
+            <thead>
+                <tr>
+                    <th class="quantity-column">Date</th>
+                    <th class="quantity-column">Breakfast</th>
+                    <th class="quantity-column">Breakfast Quantity</th>
+                    <th class="quantity-column">Lunch</th>
+                    <th class="quantity-column">Lunch Quantity</th>
+                    <th class="quantity-column">Dinner</th>
+                    <th class="quantity-column">Dinner Quantity</th>
+                    <th class="quantity-column">Extra</th>
+                    <th class="item">Details</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <!-- Data will be populated here -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Summary Table -->
+    <div class="summary-table" style="display:none;">
+        <table id="summarytable">
+            <thead>
+                <tr>
+                    <th>Meal Type</th>
+                    <th>Amount</th>
+                <th>Quantity</th>
+            </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Breakfast:</td>
+                    <td id="breakfast-Amount">0</td>
+                    <td id="breakfastQuantity">0</td>
+                </tr>
+                <tr>
+                    <td>Lunch:</td>
+                    <td id="lunch-Amount">0</td>
+                    <td id="lunchQuantity">0</td>
+                </tr>
+                <tr>
+                    <td>Dinner:</td>
+                    <td id="dinner-Amount">0</td>
+                    <td id="dinnerQuantity">0</td>
+                </tr>
+                <tr>
+                    <td>Extra:</td>
+                    <td id="extraAmount">0</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Total:</td>
+                    <td id="totalAmount">0</td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.4.0/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.14/jspdf.plugin.autotable.min.js"></script>
+    <script src="Scripts/FSMS_EXPORT_script.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+</body>
+<!-- Footer section -->
+<footer>
+    <p>Developed by Helix</p>
+    <p>Any queries and project work Contact me: muthulakshmananchellappan@gmail.com</p>
+    <p>&copy; Copyrights 2024 -- Service Management Application</p>
+</footer>
+</html>
