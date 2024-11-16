@@ -202,17 +202,22 @@ async function fetchScheduleData(selectedMonth, participantID) {
             const store = transaction.objectStore(selectedMonth);
 
             const request = store.getAll();
+
             request.onsuccess = function () {
                 const allScheduleData = request.result;
 
+                // Filter data for the selected participant
                 const participantScheduleData = allScheduleData.flatMap(entry =>
-                    entry.rowsData.filter(row => row.participantID === participantID).map(row => ({
+                    entry.rowsData.filter(row => row.participantID == participantID).map(row => ({
                         date: entry.date,
                         ...row
                     }))
                 );
 
+                // Store the filtered data in localStorage
                 localStorage.setItem('participantSchedule', JSON.stringify(participantScheduleData));
+                console.log("Generated Schedule: ", participantScheduleData);
+
                 resolve(participantScheduleData);
             };
 
@@ -274,6 +279,9 @@ function loadAmounts() {
     breakfastAmountInput.value = localStorage.getItem("breakfastAmount") || 40; // Default to 40 if not set
     lunchAmountInput.value = localStorage.getItem("lunchAmount") || 70;
     dinnerAmountInput.value = localStorage.getItem("dinnerAmount") || 40;
+    console.log("Breakfast amount:",breakfastAmountInput.value)
+    console.log("Lunch amount:",lunchAmountInput.value)
+    console.log("Dinner amount:",dinnerAmountInput.value)
 }
 
 // Call loadAmounts on page load to set the values in the input fields
@@ -545,14 +553,22 @@ updateButton.addEventListener("click", () => {
 });
 
 // Event listener for the "Generate" button
-generateButton.addEventListener("click", () => {
+generateButton.addEventListener("click", async () => {
+    const selectedParticipant = participantDropdown.value;
     const selectedMonth = monthDropdown.value;
-    const participantID = participantDropdown.value;
 
-    if (selectedMonth && participantID) {
-        generateSchedule(selectedMonth, participantID);
-    } else {
+    if (!selectedParticipant || !selectedMonth) {
         alert("Please select a participant and month to generate the schedule.");
+        return;
+    }
+
+    try {
+        await generateSchedule(selectedMonth, selectedParticipant);
+        excelbutton.disabled = false;
+        pdfbutton.disabled = false;
+    } catch (error) {
+        console.error("Error generating schedule:", error);
+        alert("Failed to generate the schedule. Please try again.");
     }
 });
 
@@ -594,6 +610,25 @@ pdfbutton.addEventListener("click", () => {
         exportToPDF();
         alert("Data successfully exported to PDF.");
     }
+});
+
+// Event listener for participant dropdown
+participantDropdown.addEventListener("change", () => {
+    // Clear the table and disable export buttons
+    tableBody.innerHTML = "";
+    excelbutton.disabled = true;
+    pdfbutton.disabled = true;
+
+    // Clear summary table
+    summaryTable.style.display = "none";
+    participantDetailsContainer.innerHTML = ""; // Reset participant details
+});
+
+// Event listener for the month dropdown
+monthDropdown.addEventListener("change", () => {
+    // Disable export buttons until the schedule is generated
+    excelbutton.disabled = true;
+    pdfbutton.disabled = true;
 });
 
 // Event listener for Schedule button

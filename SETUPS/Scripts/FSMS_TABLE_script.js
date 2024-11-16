@@ -84,21 +84,46 @@ function initIndexedDB(date) {
     return new Promise((resolve, reject) => {
         const dbName = 'FSMS_Schedule_Details_DB';
         const monthStore = new Date(date).toLocaleString('default', { month: 'long' });
-
         const request = indexedDB.open(dbName, dbVersion);
 
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
 
+            // Ensure the object store for the current month is created during upgrade
             if (!db.objectStoreNames.contains(monthStore)) {
-                const store = db.createObjectStore(monthStore, { keyPath: 'date' });
+                db.createObjectStore(monthStore, { keyPath: 'date' });
                 console.log(`Object store for ${monthStore} created.`);
             }
         };
 
         request.onsuccess = (event) => {
-            console.log(`${dbName} initialized successfully.`);
-            resolve(event.target.result);
+            const db = event.target.result;
+
+            // Check dynamically if the month store exists; create it if it doesn't
+            if (!db.objectStoreNames.contains(monthStore)) {
+                const version = db.version + 1; // Increment database version
+                db.close(); // Close the current connection to upgrade
+
+                const upgradeRequest = indexedDB.open(dbName, version);
+                upgradeRequest.onupgradeneeded = (upgradeEvent) => {
+                    const upgradedDB = upgradeEvent.target.result;
+                    upgradedDB.createObjectStore(monthStore, { keyPath: 'date' });
+                    console.log(`Object store for ${monthStore} created dynamically.`);
+                };
+
+                upgradeRequest.onsuccess = (upgradeEvent) => {
+                    console.log(`${dbName} re-initialized successfully after dynamic upgrade.`);
+                    resolve(upgradeEvent.target.result);
+                };
+
+                upgradeRequest.onerror = (upgradeEvent) => {
+                    console.error(`Error during dynamic upgrade of ${dbName}:`, upgradeEvent.target.errorCode);
+                    reject(upgradeEvent.target.errorCode);
+                };
+            } else {
+                console.log(`${dbName} initialized successfully.`);
+                resolve(db);
+            }
         };
 
         request.onerror = (event) => {
@@ -419,14 +444,14 @@ async function importCSVToScheduleDB(csvData) {
 
         const request = indexedDB.open(dbName, dbVersion);
 
-        request.onupgradeneeded = function(event) {
+        request.onupgradeneeded = function (event) {
             const db = event.target.result;
             if (!db.objectStoreNames.contains(currentMonth)) {
                 db.createObjectStore(currentMonth, { keyPath: 'date' });
             }
         };
 
-        request.onsuccess = function(event) {
+        request.onsuccess = function (event) {
             const db = event.target.result;
             const transaction = db.transaction(currentMonth, "readwrite");
             const store = transaction.objectStore(currentMonth);
@@ -435,10 +460,10 @@ async function importCSVToScheduleDB(csvData) {
             const rows = csvData.split('\n').filter(row => row.trim() !== '');
             const headers = rows[0].split(',').map(header => header.trim().toLowerCase());
 
-            // Map headers to your expected object keys
+            // Mapping headers to keys used in IndexedDB
             const headerMap = {
                 date: "date",
-                "participant id": "participantID",  // Correct mapping for participant ID
+                "participantid": "participantID", // Ensure header matches exactly (case-insensitive)
                 participant: "participant",
                 breakfast: "breakfast",
                 "breakfast qty": "breakfastQuantity",
@@ -450,30 +475,27 @@ async function importCSVToScheduleDB(csvData) {
                 details: "details"
             };
 
-            // Prepare a dictionary to store rows by date
+            // Create a dictionary to group data by date
             const scheduleByDate = {};
 
-            // Process each row (excluding headers)
+            // Process each row (skip header row)
             rows.slice(1).forEach(row => {
                 const values = row.split(',').map(value => value.trim());
-
-                // Map CSV row to the expected format
-                const entry = {
-                    participantID: values[headers.indexOf("participant id")] || '',  // Ensure participantID is correctly extracted
-                    participant: values[headers.indexOf("participant")] || '',
-                    breakfast: values[headers.indexOf("breakfast")].toLowerCase() === 'yes',
-                    breakfastQuantity: values[headers.indexOf("breakfast qty")] || '0',
-                    lunch: values[headers.indexOf("lunch")].toLowerCase() === 'yes',
-                    lunchQuantity: values[headers.indexOf("lunch qty")] || '0',
-                    dinner: values[headers.indexOf("dinner")].toLowerCase() === 'yes',
-                    dinnerQuantity: values[headers.indexOf("dinner qty")] || '0',
-                    extras: values[headers.indexOf("extras")] || '0',
-                    details: values[headers.indexOf("details")] || ''
-                };
-
-                const date = values[headers.indexOf("date")] || '';
                 
-                // Group entries by date
+                // Dynamically map CSV data to object keys
+                const entry = {};
+                for (const [csvHeader, dbKey] of Object.entries(headerMap)) {
+                    const index = headers.indexOf(csvHeader.toLowerCase());
+                    entry[dbKey] = index !== -1 ? values[index] || '' : '';
+                }
+
+                // Ensure boolean conversion for meal columns
+                entry.breakfast = entry.breakfast.toLowerCase() === 'yes';
+                entry.lunch = entry.lunch.toLowerCase() === 'yes';
+                entry.dinner = entry.dinner.toLowerCase() === 'yes';
+
+                // Group by date
+                const date = entry.date;
                 if (date) {
                     if (!scheduleByDate[date]) {
                         scheduleByDate[date] = [];
@@ -482,7 +504,7 @@ async function importCSVToScheduleDB(csvData) {
                 }
             });
 
-            // Store each date with its associated rowsData array
+            // Store grouped data in IndexedDB
             for (const [date, rowsData] of Object.entries(scheduleByDate)) {
                 store.put({ date, rowsData });
             }
@@ -491,14 +513,14 @@ async function importCSVToScheduleDB(csvData) {
                 console.log("CSV schedule data imported successfully to IndexedDB.");
                 resolve();
             };
-            
+
             transaction.onerror = (event) => {
                 console.error("Error importing schedule CSV to IndexedDB:", event.target.errorCode);
                 reject(event.target.errorCode);
             };
         };
 
-        request.onerror = function(event) {
+        request.onerror = function (event) {
             console.error("Error opening database for schedule import:", event.target.errorCode);
             reject(event.target.errorCode);
         };
