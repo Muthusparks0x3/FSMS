@@ -27,6 +27,8 @@ const importParticipantsDB = document.getElementById("importParticipants");
 const importFileInput = document.getElementById("importFileInput");
 //Export page button
 const ExportPage = document.getElementById("Exportpage");
+// Predefined password
+const SETTINGS_PASSWORD = "Helix@0x3";
 
 let db;
 let participants = []; // Ensure participants array is defined here
@@ -394,8 +396,16 @@ function importCSVToIndexedDB(csvData) {
 }
 
 settingsIcon.addEventListener('click', () => {
-    // Toggle popup visibility
-    settingsPopup.style.display = settingsPopup.style.display === 'block' ? 'none' : 'block';
+    // Prompt for the password
+    const enteredPassword = prompt("Please enter the settings password:");
+    
+    // Check if the password is correct
+    if (enteredPassword === SETTINGS_PASSWORD) {
+        // Toggle popup visibility
+        settingsPopup.style.display = settingsPopup.style.display === 'block' ? 'none' : 'block';
+    } else {
+        alert("Incorrect password. Access denied.");
+    }
 });
 
 // Close the popup if the user clicks outside of it
