@@ -27,6 +27,11 @@ const importParticipantsDB = document.getElementById("importParticipants");
 const importFileInput = document.getElementById("importFileInput");
 //Export page button
 const ExportPage = document.getElementById("Exportpage");
+//password modal
+const passwordModal = document.getElementById('passwordModal');
+const settingsPasswordInput = document.getElementById('settingsPassword');
+const submitPasswordBtn = document.getElementById('submitPasswordBtn');
+const cancelPasswordBtn = document.getElementById('cancelPasswordBtn');
 // Predefined password
 const SETTINGS_PASSWORD = "Helix@0x3";
 
@@ -395,16 +400,50 @@ function importCSVToIndexedDB(csvData) {
     };
 }
 
-settingsIcon.addEventListener('click', () => {
-    // Prompt for the password
-    const enteredPassword = prompt("Please enter the settings password:");
-    
-    // Check if the password is correct
+// Function to validate the entered password
+function validatePassword() {
+    const enteredPassword = settingsPasswordInput.value;
     if (enteredPassword === SETTINGS_PASSWORD) {
-        // Toggle popup visibility
-        settingsPopup.style.display = settingsPopup.style.display === 'block' ? 'none' : 'block';
+        // Password is correct; show the settings popup
+        passwordModal.style.display = 'none';
+        settingsPopup.style.display = 'block';
     } else {
         alert("Incorrect password. Access denied.");
+        settingsPasswordInput.value = ''; // Clear the input field
+        settingsPasswordInput.focus(); // Refocus the input field
+    }
+}
+
+// Show the password modal when the settings icon is clicked
+settingsIcon.addEventListener('click', () => {
+    passwordModal.style.display = 'block';
+    settingsPasswordInput.value = ''; // Clear the input field
+    settingsPasswordInput.focus(); // Focus on the input field
+});
+
+// Handle password submission when the submit button is clicked
+submitPasswordBtn.addEventListener('click', validatePassword);
+
+// Handle password submission when the Enter key is pressed
+settingsPasswordInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+        validatePassword();
+    }
+});
+
+// Handle password modal cancellation
+cancelPasswordBtn.addEventListener('click', () => {
+    passwordModal.style.display = 'none';
+    settingsPasswordInput.value = ''; // Clear the input field
+});
+
+// Close the password modal and settings popup if the user clicks outside them
+document.addEventListener('click', (event) => {
+    if (!passwordModal.contains(event.target) && event.target !== settingsIcon) {
+        passwordModal.style.display = 'none';
+    }
+    if (!settingsPopup.contains(event.target) && event.target !== settingsIcon) {
+        settingsPopup.style.display = 'none';
     }
 });
 

@@ -245,6 +245,34 @@ button:hover {
     color: white;
 }
 
+#passwordModal{
+    display: none; 
+    position: fixed; 
+    top: 50%; 
+    left: 50%; 
+    transform: translate(-50%, -50%); 
+    background-color: white; 
+    padding: 20px; 
+    border: 1px solid #ccc; 
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3); 
+    z-index: 2000;
+}
+
+#settingsPassword{
+    padding: 5px; 
+    width: 100%; 
+    margin-bottom: 10px;
+}
+
+#submitPasswordBtn{
+    padding: 5px 10px; 
+    margin-right: 5px;
+}
+
+#cancelPasswordBtn{
+    padding: 5px 10px;
+}
+
 /* Footer styles */
 footer {
     margin-top: 20px;
