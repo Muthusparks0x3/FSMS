@@ -264,13 +264,9 @@ button:hover {
     margin-bottom: 10px;
 }
 
-#submitPasswordBtn{
+#cancelPasswordBtn{
     padding: 5px 10px; 
     margin-right: 5px;
-}
-
-#cancelPasswordBtn{
-    padding: 5px 10px;
 }
 
 /* Footer styles */

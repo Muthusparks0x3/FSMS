@@ -24,7 +24,8 @@ async function getParticipants() {
                 const participants = allParticipants.result.map(participant => ({
                     name: participant.name,
                     participantID: participant.participantID
-                }));
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
                 resolve(participants);
             };
             allParticipants.onerror = () => {
@@ -172,6 +173,9 @@ async function saveTableDataToIndexedDB() {
         return;
     }
 
+    // Sort rows by participant name before saving
+    rowsData.sort((a, b) => a.participant.localeCompare(b.participant));
+
     const monthStore = new Date(date).toLocaleString('default', { month: 'long' });
 
     try {
@@ -208,25 +212,49 @@ async function loadTableData() {
 
     try {
         const db = await initIndexedDB(date); // Ensure object store exists
+        const participants = await getParticipants(); // Get all current participants
 
         const transaction = db.transaction(monthStore, 'readonly');
         const store = transaction.objectStore(monthStore);
         const dataRequest = store.get(date);
 
         dataRequest.onsuccess = (event) => {
-            const data = event.target.result;
-            if (data) {
-                populateTableWithData(data.rowsData);
-            } else {
-                console.warn('No saved data for the selected date.');
-                populateTableRows(); // Load default rows if no data
-            }
+            const savedData = event.target.result ? event.target.result.rowsData : [];
+            const savedParticipantIDs = savedData.map(row => row.participantID);
+
+            // Identify missing participants
+            const missingParticipants = participants.filter(
+                participant => !savedParticipantIDs.includes(participant.participantID)
+            );
+
+            // Populate default rows for missing participants
+            const defaultRows = missingParticipants.map(participant => ({
+                participantID: participant.participantID,
+                participant: participant.name,
+                breakfast: false,
+                breakfastQuantity: 0,
+                lunch: false,
+                lunchQuantity: 0,
+                dinner: false,
+                dinnerQuantity: 0,
+                extras: 0,
+                details: ''
+            }));
+
+            // Merge saved data with default rows
+            const combinedData = [...savedData, ...defaultRows].sort((a, b) => 
+                a.participant.localeCompare(b.participant));
+            populateTableWithData(combinedData);
+        };
+
+        dataRequest.onerror = () => {
+            console.error('Error retrieving data for the selected date.');
+            populateTableRows(); // Load default rows if no saved data
         };
     } catch (error) {
         console.error('Error loading table data:', error);
     }
 }
-
 
 // Populate table with existing data for a specific date
 function populateTableWithData(rowsData) {

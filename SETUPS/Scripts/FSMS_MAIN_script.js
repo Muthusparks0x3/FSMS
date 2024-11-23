@@ -30,8 +30,9 @@ const ExportPage = document.getElementById("Exportpage");
 //password modal
 const passwordModal = document.getElementById('passwordModal');
 const settingsPasswordInput = document.getElementById('settingsPassword');
-const submitPasswordBtn = document.getElementById('submitPasswordBtn');
 const cancelPasswordBtn = document.getElementById('cancelPasswordBtn');
+//Participant list
+const participantlistbtn = document.getElementById("participantListBtn");
 // Predefined password
 const SETTINGS_PASSWORD = "Helix@0x3";
 
@@ -49,7 +50,7 @@ function initDB() {
 
         // Check if the object store exists, if not create it
         if (!db.objectStoreNames.contains("participants")) {
-            const store = db.createObjectStore("participants", { keyPath: "id", autoIncrement: true });
+            const store = db.createObjectStore("participants", { keyPath: "participantID" });
             store.createIndex("name_id", ["name", "participantID"], { unique: true });
             console.log("Object store 'participants' created.");
         }
@@ -81,6 +82,9 @@ function loadParticipants() {
     request.onsuccess = function(event) {
         participants = event.target.result || []; // Store participants in array, ensure it's not undefined
         console.log("Participants loaded:", participants);
+        
+        // Sort participants alphabetically by name
+        participants.sort((a, b) => a.name.localeCompare(b.name))
 
         // Update the dropdown and display total participants
         updateDropdown(participants);
@@ -109,9 +113,9 @@ function generateParticipantID(callback) {
             }
             cursor.continue();
         } else {
-            // Once iteration is complete, generate the new participantID
-            const newParticipantID = lastParticipantID + 1;
-            callback(newParticipantID);
+            // Once iteration is complete, generate the new participantID as a string
+            const ParticipantID = (lastParticipantID + 1).toString();
+            callback(ParticipantID);
         }
     };
 
@@ -122,21 +126,20 @@ function generateParticipantID(callback) {
 }
 
 // Add participant
-function addParticipant() { 
+function addParticipant() {
     const name = document.getElementById('addName').value;
     const mobile = document.getElementById('addMobile').value;
     const address = document.getElementById('addAddress').value;
 
     if (name && mobile && address) {
-        // Generate a new participantID and add participant once generated
-        generateParticipantID(function(newParticipantID) {
-            if (newParticipantID !== null) {
+        generateParticipantID(function(ParticipantID) {
+            if (ParticipantID !== null) {
                 const transaction = db.transaction("participants", "readwrite");
                 const store = transaction.objectStore("participants");
 
-                // Add participant with new participantID
+                // Add participant with new participantID as a string
                 store.add({
-                    participantID: newParticipantID,  // Store auto-incremented participantID
+                    participantID: ParticipantID,
                     name: name,
                     mobile: mobile,
                     address: address
@@ -172,7 +175,7 @@ function updateDropdown(participantsList) {
     participantDropdown.innerHTML = '<option value="">Select Participant</option>';
     participantsList.forEach(p => {
         const option = document.createElement("option");
-        option.value = p.id;
+        option.value = p.participantID; // Use participantID as the value
         option.textContent = p.name;
         participantDropdown.appendChild(option);
     });
@@ -195,52 +198,191 @@ participantDropdown.addEventListener('change', () => {
 
 // Edit participant
 function editParticipant() {
-    const selectedId = participantDropdown.value;
-    if (selectedId) {
+    const selectedParticipantID = participantDropdown.value; // Get selected participant ID from dropdown
+    if (selectedParticipantID) {
         const transaction = db.transaction("participants", "readonly");
         const store = transaction.objectStore("participants");
-        store.get(Number(selectedId)).onsuccess = function(event) {
-            const participant = event.target.result;
-            document.getElementById('editName').value = participant.name;
-            document.getElementById('editMobile').value = participant.mobile;
-            document.getElementById('editAddress').value = participant.address;
-            editParticipantPopup.dataset.id = participant.id;
-            editParticipantPopup.style.display = 'block';
+
+        // Use an index or cursor to search by participantID (assumed to be stored as a string)
+        const request = store.openCursor();
+        request.onsuccess = function (event) {
+            const cursor = event.target.result;
+            if (cursor) {
+                if (cursor.value.participantID === selectedParticipantID) {
+                    const participant = cursor.value;
+                    document.getElementById('editName').value = participant.name;
+                    document.getElementById('editMobile').value = participant.mobile;
+                    document.getElementById('editAddress').value = participant.address;
+
+                    // Save the participantID for reference
+                    editParticipantPopup.dataset.participantId = participant.participantID;
+                    editParticipantPopup.style.display = 'block';
+                    return; // Exit once the correct participant is found
+                }
+                cursor.continue();
+            } else {
+                alert("Participant not found.");
+            }
+        };
+
+        request.onerror = function () {
+            console.error("Error searching for participant.");
+            alert("Failed to load participant details.");
         };
     }
 }
 
 // Save changes to participant
 function saveChanges() {
-    const id = Number(editParticipantPopup.dataset.id);
-    const name = document.getElementById('editName').value;
-    const mobile = document.getElementById('editMobile').value;
-    const address = document.getElementById('editAddress').value;
+    const participantID = editParticipantPopup.dataset.participantId; // Retrieve the participantID
+    const name = document.getElementById('editName').value.trim();
+    const mobile = document.getElementById('editMobile').value.trim();
+    const address = document.getElementById('editAddress').value.trim();
 
-    // Ask for confirmation before saving changes
+    // Confirm before saving changes
     if (confirm("Are you sure you want to save changes?")) {
         const transaction = db.transaction("participants", "readwrite");
         const store = transaction.objectStore("participants");
-        store.put({ id, name, mobile, address }).onsuccess = () => {
-            loadParticipants();
-            alert("Participant details updated successfully!"); // Success message
+
+        // Use a cursor to find the participant by participantID and update their details
+        const request = store.openCursor();
+        request.onsuccess = function (event) {
+            const cursor = event.target.result;
+            if (cursor) {
+                if (cursor.value.participantID === participantID) {
+                    const updatedParticipant = {
+                        ...cursor.value, // Keep existing fields intact
+                        name: name,
+                        mobile: mobile,
+                        address: address,
+                    };
+
+                    cursor.update(updatedParticipant).onsuccess = function () {
+                        alert("Participant details updated successfully!");
+                        loadParticipants(); // Refresh participant table
+                    };
+
+                    return; // Exit after updating
+                }
+                cursor.continue();
+            } else {
+                alert("Participant not found.");
+            }
+        };
+
+        request.onerror = function () {
+            console.error("Error saving participant details.");
+            alert("Failed to save changes. Please try again.");
         };
     }
 }
 
 // Delete participant
 function deleteParticipant() {
-    const id = Number(editParticipantPopup.dataset.id);
-    const name = document.getElementById('editName').value;
+    const participantID = editParticipantPopup.dataset.participantId; // Use participantID
+    const transaction = db.transaction("participants", "readwrite");
+    const participantsStore = transaction.objectStore("participants");
 
-    // Ask for confirmation before deleting
-    if (confirm(`Are you sure you want to delete participant "${name}"?`)) {
-        const transaction = db.transaction("participants", "readwrite");
-        transaction.objectStore("participants").delete(id).onsuccess = () => {
-            loadParticipants();
-            alert(`Participant "${name}" deleted successfully!`); // Success message
-        };
-    }
+    // Fetch participant details using participantID
+    const getAllRequest = participantsStore.getAll();
+
+    getAllRequest.onsuccess = async () => {
+        const participants = getAllRequest.result;
+        const participant = participants.find(p => p.participantID === participantID);
+
+        if (participant) {
+            const { name } = participant;
+
+            // Confirm deletion
+            if (confirm(`Are you sure you want to delete participant "${name}" and all their associated data?`)) {
+                // Delete participant by matching participantID
+                const deleteRequest = participantsStore.delete(participant.participantID); // Use participantID for deletion
+
+                deleteRequest.onsuccess = async () => {
+                    console.log(`Participant "${name}" with participantID ${participantID} deleted from participants store.`);
+
+                    // Delete associated schedule data
+                    await deleteParticipantData(participantID);
+
+                    // Reload participants to reflect changes
+                    loadParticipants();
+                    alert(`Participant "${name}" and their associated data were deleted successfully!`);
+                };
+
+                deleteRequest.onerror = (e) => {
+                    console.error("Error deleting participant:", e);
+                };
+            }
+        } else {
+            alert("Participant not found.");
+        }
+    };
+
+    getAllRequest.onerror = (e) => {
+        console.error("Error fetching participant details:", e);
+    };
+}
+
+async function deleteParticipantData(participantID) {
+    console.log(`Starting data deletion for participantID: ${participantID}`);
+
+    const dbRequest = indexedDB.open('FSMS_Schedule_Details_DB', dbVersion);
+
+    dbRequest.onsuccess = (event) => {
+        const db = event.target.result;
+
+        // Ensure the database is open and ready before proceeding
+        if (db) {
+            // Get all object store names (representing months)
+            const objectStores = Array.from(db.objectStoreNames);
+            console.log("Object store names:", objectStores);
+
+            objectStores.forEach((storeName) => {
+                const transaction = db.transaction(storeName, 'readwrite');
+                const store = transaction.objectStore(storeName);
+
+                const getAllRequest = store.getAll();
+
+                getAllRequest.onsuccess = () => {
+                    const records = getAllRequest.result;
+
+                    console.log(`Fetched ${records.length} records from store "${storeName}".`);
+
+                    // Filter and update records to exclude the participant's data
+                    const updatedRecords = records.map(record => {
+                        const originalLength = record.rowsData.length;
+                        record.rowsData = record.rowsData.filter(row => row.participantID !== participantID);
+                        console.log(`Updated record for date ${record.date}: Removed ${originalLength - record.rowsData.length} rows.`);
+                        return record;
+                    }).filter(record => record.rowsData.length > 0);
+
+                    // Clear the store and insert updated records
+                    const clearRequest = store.clear();
+
+                    clearRequest.onsuccess = () => {
+                        console.log(`Cleared object store "${storeName}". Re-inserting updated records.`);
+                        updatedRecords.forEach(record => {
+                            store.put(record);
+                        });
+                    };
+
+                    clearRequest.onerror = (e) => {
+                        console.error(`Error clearing store "${storeName}":`, e);
+                    };
+                };
+
+                getAllRequest.onerror = (e) => {
+                    console.error(`Error fetching data from store "${storeName}":`, e);
+                };
+            });
+        } else {
+            console.error('Database does not exist or failed to open.');
+        }
+    };
+
+    dbRequest.onerror = (e) => {
+        console.error('Failed to open FSMS_Schedule_Details_DB:', e);
+    };
 }
 
 async function exportParticipantsToCSV() {
@@ -253,19 +395,18 @@ async function exportParticipantsToCSV() {
             const store = transaction.objectStore("participants");
 
             let csvContent = 'data:text/csv;charset=utf-8,';
-            csvContent += 'ID,ParticipantID,Name,Mobile,Address\n';
+            csvContent += 'ParticipantID,Name,Mobile,Address\n'; // Removed 'ID' column
 
             store.openCursor().onsuccess = function(event) {
                 const cursor = event.target.result;
                 if (cursor) {
                     const participant = cursor.value;
-                    const id = participant.id || '';
-                    const participantID = participant.participantID || ''; // Include participantID
+                    const participantID = participant.participantID || ''; // Only include participantID
                     const name = participant.name || '';
                     const mobile = participant.mobile || '';
                     const address = participant.address || '';
 
-                    csvContent += `${id},${participantID},${name},${mobile},${address}\n`;
+                    csvContent += `${participantID},${name},${mobile},${address}\n`; // Removed 'id' from CSV
 
                     cursor.continue();
                 } else {
@@ -292,6 +433,7 @@ async function exportParticipantsToCSV() {
         };
     });
 }
+
 
 
 // Handle file selection and import to IndexedDB
@@ -323,7 +465,7 @@ function importCSVToIndexedDB(csvData) {
     const headerMap = {
         participantid: "ParticipantID",
         name: "name",
-        mobile: "mobile" ,  
+        mobile: "mobile",  
         address: "address"
     };
 
@@ -420,9 +562,6 @@ settingsIcon.addEventListener('click', () => {
     settingsPasswordInput.value = ''; // Clear the input field
     settingsPasswordInput.focus(); // Focus on the input field
 });
-
-// Handle password submission when the submit button is clicked
-submitPasswordBtn.addEventListener('click', validatePassword);
 
 // Handle password submission when the Enter key is pressed
 settingsPasswordInput.addEventListener('keydown', (event) => {
@@ -530,6 +669,11 @@ logoutbutton.addEventListener("click", () => {
     // Add functionality for Logout button
     alert("Logging out...");
     window.location.href = "FSMS_LOGIN.html"; // Redirect to the login page
+});
+
+//participant list
+participantListBtn.addEventListener("click", () => {
+    window.location.href = "FSMS_PARTICIPANT_LIST.html"; // Redirect to the participant list page
 });
 
 // Initialize IndexedDB and object stores on page load

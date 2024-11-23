@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="Icons/Contacts_icon.png" type="image/png">
+    <link rel="stylesheet" href="CSS/FSMS_PARTICIPANT_LIST.css">
+    <title>Participant Management</title>
+</head>
+<body>
+    <h1>Participant Management</h1>
+    <!-- Schedule Button -->
+    <button id="scheduleButton" class="top-left-button">Schedule</button>
+
+    <table id="participantTable" border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Mobile</th>
+                <th>Address</th>
+                <th>Edit</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody id="participantsTableBody"></tbody>
+    </table>
+
+    <!-- Edit Participant Popup -->
+    <div id="editParticipantPopup">
+        <h3>Edit Participant</h3>
+        <input type="text" id="editName" placeholder="Name">
+        <input type="text" id="editMobile" placeholder="Mobile">
+        <input type="text" id="editAddress" placeholder="Address">
+        <button id="saveChangesBtn">Save Changes</button>
+        <button id="cancelEditPopup">Cancel</button>
+    </div>
+
+    <script src="Scripts/FSMS_PARTICIPANT_LIST_script.js"></script>
+</body>
+</html>

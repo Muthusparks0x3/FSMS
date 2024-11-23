@@ -171,6 +171,7 @@ th {
     background-color: #4CAF50; /* Green header */
     color: white;
     font-weight: bold;
+    
 }
 
 tbody tr:nth-child(even) {
@@ -333,7 +334,7 @@ tbody tr:nth-child(odd) {
 footer {
     margin-top: 20px;
     text-align: center;
-    font-size: 0.9em;
+    font-size: 0.7em;
     color: #777; /* Grey color for footer text */
 }
 

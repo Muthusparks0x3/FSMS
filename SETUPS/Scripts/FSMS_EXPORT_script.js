@@ -354,7 +354,7 @@ function exportToExcel() {
     const fileName = `${participantDetails.Name}_${currentMonth}_Food_Schedule_Bill.xlsx`;
 
     // Add title
-    const title = `A to Z Food ${currentMonth} Bill`;
+    const title = `A to Z Food Service ${currentMonth} Bill`;
     XLSX.utils.sheet_add_aoa(ws, [[title]], { origin: "A1" });
     ws["!merges"] = [{ s: { c: 0, r: 0 }, e: { c: 3, r: 0 } }]; // Merge cells for the title
 
@@ -444,7 +444,7 @@ function exportToPDF() {
     const fileName = `${participantDetails.Name}_${currentMonth}_Food_Schedule_Bill.pdf`;
 
     // Add Title
-    const title = `A to Z Food ${currentMonth} Bill`;
+    const title = `A to Z Food Service ${currentMonth} Bill`;
     pdf.setFontSize(16);
     pdf.text(title, pdf.internal.pageSize.getWidth() / 2, 20, { align: "center" });
 
