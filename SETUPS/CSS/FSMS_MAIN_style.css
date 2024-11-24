@@ -58,7 +58,7 @@ button:hover {
 }
 
 #searchBar{
-    width: 80%;
+    width: 50%;
     padding: 10px;
     margin-bottom: 10px;
     border: 1px solid #d1d1d1; /* Lighter gray border */
@@ -66,14 +66,38 @@ button:hover {
     font-size: 1em;
 }
 
-#participantDropdown {
-    margin-top: 10px;
-    padding: 5px;
-    width: 80%;
-    border-radius: 5px;
+#searchButton {
+    padding: 8px;
     border: 1px solid #ccc;
-    font-size: 1em;
-    margin-bottom: 20px;
+    border-left: none;
+    background-color: #f8f8f8;
+    cursor: pointer;
+    border-radius: 0 4px 4px 0;
+}
+
+#searchButton:hover {
+    background-color: #e0e0e0;
+}
+
+/* Suggestions Styling */
+#suggestions {
+    position: absolute;
+    top: 40px;
+    left: 0;
+    width: 300px;
+    border: 1px solid #ccc;
+    background-color: white;
+    z-index: 1000;
+    display: none;
+}
+
+#suggestions div {
+    padding: 8px;
+    cursor: pointer;
+}
+
+#suggestions div:hover {
+    background-color: #f0f0f0;
 }
 
 #totalParticipants {
@@ -89,7 +113,7 @@ button:hover {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     margin-top: 20px;
     width: 100%;
-    max-width: 500px;
+    max-width: 650px;
     text-align: center;
 }
 

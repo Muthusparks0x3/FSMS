@@ -90,9 +90,9 @@ tr {
     height: 20px; /* Set a minimum row height */
 }
 
-/* Popup Styling */
-#editParticipantPopup {
-    display: none;
+/* Common Popup Styling */
+.modal {
+    display: none; /* Hidden by default */
     position: fixed;
     top: 50%;
     left: 50%;
@@ -102,33 +102,107 @@ tr {
     border: 1px solid #ccc;
     box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
     z-index: 1000;
+    border-radius: 10px;
+    width: 350px;
+    max-width: 90%;
 }
 
-#editParticipantPopup input {
+.modal-header {
+    font-size: 1.5em;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+.modal-content input {
     display: block;
     margin: 10px 0;
     width: 100%;
     padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
 }
 
-button {
+.modal-actions {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 20px;
+}
+
+.modal-actions button {
+    padding: 10px 20px;
+    font-size: 1em;
+    border-radius: 5px;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.3s;
+}
+
+.modal-actions .save-btn {
+    background-color: #4CAF50; /* Green */
+    color: white;
+}
+
+.modal-actions .save-btn:hover {
+    background-color: #45a049;
+}
+
+.modal-actions .cancel-btn {
+    background-color: #dc3545; /* Red */
+    color: white;
+}
+
+.modal-actions .cancel-btn:hover {
+    background-color: #c82333;
+}
+
+#totalParticipants {
+    margin: 20px;
+    font-size: 1em;
+    text-align: center;
+}
+
+/* Search Bar Styles */
+.search-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+#searchBar {
+    width: 300px;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-right: none;
+}
+
+#searchButton {
+    padding: 6px;
+    border: 1px solid #ccc;
+    background-color: #f8f8f8;
     cursor: pointer;
 }
 
-#editParticipantPopup button {
-    margin-right: 10px;
+#searchButton:hover {
+    background-color: #e0e0e0;
 }
 
-.popup button:hover {
-    background-color: #218838;
+/* Suggestions Styles */
+#suggestions {
+    position: absolute;
+    width: 300px;
+    border: 1px solid #ccc;
+    background-color: #fff;
+    z-index: 10;
+    display: none;
 }
 
-.popup .cancel-btn {
-    background-color: #dc3545;
+#suggestions div {
+    padding: 5px;
+    cursor: pointer;
 }
 
-.popup .cancel-btn:hover {
-    background-color: #c82333;
+#suggestions div:hover {
+    background-color: #f0f0f0;
 }
 
 /* Footer styling */

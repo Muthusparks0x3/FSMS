@@ -12,6 +12,17 @@
     <!-- Schedule Button -->
     <button id="scheduleButton" class="top-left-button">Schedule</button>
 
+    <!-- Search Bar with Icon -->
+    <div class="search-container">
+        <input type="text" id="searchBar" placeholder="Search participant..." />
+        <button id="searchButton">🔍</button>
+        <button id="addParticipantButton">Add Participant</button>
+        <!-- Total Participants Display -->
+        <div id="totalParticipants">Total Participants: 0</div>
+    </div>
+    <div id="suggestions"></div>
+    </div>
+
     <table id="participantTable" border="1">
         <thead>
             <tr>
@@ -26,14 +37,32 @@
         <tbody id="participantsTableBody"></tbody>
     </table>
 
-    <!-- Edit Participant Popup -->
-    <div id="editParticipantPopup">
-        <h3>Edit Participant</h3>
-        <input type="text" id="editName" placeholder="Name">
-        <input type="text" id="editMobile" placeholder="Mobile">
-        <input type="text" id="editAddress" placeholder="Address">
-        <button id="saveChangesBtn">Save Changes</button>
-        <button id="cancelEditPopup">Cancel</button>
+    <!-- Add Participant Popup -->
+    <div id="addParticipantPopup" class="modal">
+        <h3 class="modal-header">Add Participant</h3>
+        <div class="modal-content">
+            <input type="text" id="addName" placeholder="Name">
+            <input type="text" id="addMobile" placeholder="Mobile">
+            <input type="text" id="addAddress" placeholder="Address">
+        </div>
+        <div class="modal-actions">
+            <button id="saveParticipantButton" class="save-btn">Save</button>
+            <button id="cancelParticipantButton" class="cancel-btn">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Edit Participant Popup (Example using the same style) -->
+    <div id="editParticipantPopup" class="modal">
+        <h3 class="modal-header">Edit Participant</h3>
+        <div class="modal-content">
+            <input type="text" id="editName" placeholder="Name">
+            <input type="text" id="editMobile" placeholder="Mobile">
+            <input type="text" id="editAddress" placeholder="Address">
+        </div>
+        <div class="modal-actions">
+            <button id="saveEditButton" class="save-btn">Save</button>
+            <button id="cancelEditButton" class="cancel-btn">Cancel</button>
+        </div>
     </div>
 
     <script src="Scripts/FSMS_PARTICIPANT_LIST_script.js"></script>

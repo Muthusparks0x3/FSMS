@@ -555,6 +555,35 @@ async function importCSVToScheduleDB(csvData) {
     });
 }
 
+function highlightParticipantRow(name) {
+    const rows = tableBody.querySelectorAll("tr");
+    let found = false;
+
+    rows.forEach((row) => {
+        const participantNameCell = row.cells[0]; // Assuming the first column contains participant names
+        if (
+            participantNameCell &&
+            participantNameCell.textContent.toLowerCase() === name.toLowerCase()
+        ) {
+            row.style.backgroundColor = "lightyellow"; // Highlight row
+            row.scrollIntoView({ behavior: "smooth", block: "center" });
+            found = true;
+        } else {
+            row.style.backgroundColor = ""; // Reset background for other rows
+        }
+    });
+
+    if (!found) {
+        alert("Participant not found in the table.");
+    }
+}
+
+// Listen for the custom search event
+document.addEventListener("searchParticipant", (event) => {
+    const query = event.detail.query;
+    highlightParticipantRow(query);
+});
+
 // Add event listener to trigger the file input dialog when "Import Schedule" is clicked
 importScheduleDB.addEventListener("click", () => {
     importScheduleFileInput.click(); // Opens the file dialog

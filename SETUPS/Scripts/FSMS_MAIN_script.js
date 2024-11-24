@@ -9,7 +9,8 @@ const saveChangesBtn = document.getElementById('saveChangesBtn');
 const cancelEditPopup = document.getElementById('cancelEditPopup');
 const deleteParticipantBtn = document.getElementById('deleteParticipantBtn');
 const searchBar = document.getElementById('searchBar');
-const participantDropdown = document.getElementById('participantDropdown');
+const searchButton = document.getElementById("searchButton");
+const suggestionsContainer = document.getElementById("suggestions");
 const totalParticipants = document.getElementById('totalParticipants');
 const logoutbutton =  document.getElementById("logoutButton")
 // Get the refresh button element
@@ -86,14 +87,48 @@ function loadParticipants() {
         // Sort participants alphabetically by name
         participants.sort((a, b) => a.name.localeCompare(b.name))
 
-        // Update the dropdown and display total participants
-        updateDropdown(participants);
-        totalParticipants.textContent = `Total Participants: ${participants.length}`;
+        // Update and display total participants
+        updateTotalParticipants(participants.length);
     };
 
     request.onerror = function(event) {
         console.error("Error loading participants", event.target.errorCode);
     };
+}
+
+// Update total participants count
+function updateTotalParticipants(count) {
+    totalParticipants.textContent = `Total Participants: ${count}`;
+}
+
+// Update suggestions based on search input
+function updateSuggestions(query) {
+    const filtered = participants.filter((p) =>
+        p.name.toLowerCase().startsWith(query.toLowerCase())
+    );
+
+    suggestionsContainer.innerHTML = "";
+    if (query && filtered.length > 0) {
+        filtered.forEach((participant) => {
+            const suggestion = document.createElement("div");
+            suggestion.textContent = participant.name;
+            suggestion.addEventListener("click", () => {
+                searchBar.value = participant.name;
+                suggestionsContainer.style.display = "none";
+                dispatchSearchEvent(participant.name);
+            });
+            suggestionsContainer.appendChild(suggestion);
+        });
+        suggestionsContainer.style.display = "block";
+    } else {
+        suggestionsContainer.style.display = "none";
+    }
+}
+
+// Dispatch a custom event to trigger the search in FSMS_TABLE_script.js
+function dispatchSearchEvent(query) {
+    const searchEvent = new CustomEvent("searchParticipant", { detail: { query } });
+    document.dispatchEvent(searchEvent);
 }
 
 // Function to generate a unique participantID starting from 100
@@ -170,55 +205,37 @@ function clearAddParticipantFields() {
     document.getElementById('addAddress').value = '';
 }
 
-// Update dropdown with participants
-function updateDropdown(participantsList) {
-    participantDropdown.innerHTML = '<option value="">Select Participant</option>';
-    participantsList.forEach(p => {
-        const option = document.createElement("option");
-        option.value = p.participantID; // Use participantID as the value
-        option.textContent = p.name;
-        participantDropdown.appendChild(option);
-    });
-    editParticipantBtn.disabled = true; // Disable edit button initially
-}
-
-// Filter dropdown based on search input with exact start of name match
-searchBar.addEventListener('input', () => {
-    const searchText = searchBar.value.toLowerCase();
-    const filteredParticipants = participants.filter(p => 
-        p.name.toLowerCase().startsWith(searchText) // Match from the beginning of the name
-    );
-    updateDropdown(filteredParticipants);
-});
-
-// Enable edit button when a participant is selected
-participantDropdown.addEventListener('change', () => {
-    editParticipantBtn.disabled = participantDropdown.value === "";
-});
-
 // Edit participant
 function editParticipant() {
-    const selectedParticipantID = participantDropdown.value; // Get selected participant ID from dropdown
-    if (selectedParticipantID) {
+    const searchQuery = searchBar.value.trim(); // Get the search query from the search bar
+
+    if (searchQuery) {
         const transaction = db.transaction("participants", "readonly");
         const store = transaction.objectStore("participants");
 
-        // Use an index or cursor to search by participantID (assumed to be stored as a string)
+        // Open a cursor to iterate through participants
         const request = store.openCursor();
         request.onsuccess = function (event) {
             const cursor = event.target.result;
-            if (cursor) {
-                if (cursor.value.participantID === selectedParticipantID) {
-                    const participant = cursor.value;
-                    document.getElementById('editName').value = participant.name;
-                    document.getElementById('editMobile').value = participant.mobile;
-                    document.getElementById('editAddress').value = participant.address;
 
-                    // Save the participantID for reference
+            if (cursor) {
+                const participant = cursor.value;
+
+                // Match the participant's name (case-insensitive)
+                if (participant.name.toLowerCase() === searchQuery.toLowerCase()) {
+                    // Populate the edit fields
+                    document.getElementById("editName").value = participant.name;
+                    document.getElementById("editMobile").value = participant.mobile;
+                    document.getElementById("editAddress").value = participant.address;
+
+                    // Store the participantID for reference
                     editParticipantPopup.dataset.participantId = participant.participantID;
-                    editParticipantPopup.style.display = 'block';
-                    return; // Exit once the correct participant is found
+
+                    // Show the edit popup
+                    editParticipantPopup.style.display = "block";
+                    return; // Stop further cursor iterations
                 }
+
                 cursor.continue();
             } else {
                 alert("Participant not found.");
@@ -229,6 +246,8 @@ function editParticipant() {
             console.error("Error searching for participant.");
             alert("Failed to load participant details.");
         };
+    } else {
+        alert("Search field is empty. Cannot edit participant.");
     }
 }
 
@@ -555,6 +574,36 @@ function validatePassword() {
         settingsPasswordInput.focus(); // Refocus the input field
     }
 }
+
+// Event Listeners
+searchBar.addEventListener("input", () => {
+    updateSuggestions(searchBar.value);
+    const searchQuery = searchBar.value.trim();
+    editParticipantBtn.disabled = !searchQuery; // Disable if the search field is empty
+});
+
+searchBar.addEventListener("keypress", (event) => {
+    if (event.key === "Enter") {
+        const query = searchBar.value.trim();
+        if (query) {
+            dispatchSearchEvent(query);
+            suggestionsContainer.style.display = "none";
+        } else {
+            alert("Please enter a participant's name to search.");
+        }
+    }
+});
+
+searchButton.addEventListener("click", () => {
+    const query = searchBar.value.trim();
+    if (query) {
+        dispatchSearchEvent(query);
+        suggestionsContainer.style.display = "none";
+    } else {
+        alert("Please enter a participant's name to search.");
+    }
+});
+
 
 // Show the password modal when the settings icon is clicked
 settingsIcon.addEventListener('click', () => {
