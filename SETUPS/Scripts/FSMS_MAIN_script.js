@@ -34,6 +34,13 @@ const settingsPasswordInput = document.getElementById('settingsPassword');
 const cancelPasswordBtn = document.getElementById('cancelPasswordBtn');
 //Participant list
 const participantlistbtn = document.getElementById("participantListBtn");
+//storage options
+const storageOption = document.getElementById('storageOption');
+const storagePopup = document.getElementById('storagePopup');
+const closeStoragePopup = document.getElementById('closeStoragePopup');
+const participantsStorage = document.getElementById('participantsStorage');
+const scheduleStorage = document.getElementById('scheduleStorage');
+const availableStorage = document.getElementById('availableStorage');
 // Predefined password
 const SETTINGS_PASSWORD = "Helix@0x3";
 
@@ -575,6 +582,108 @@ function validatePassword() {
     }
 }
 
+// Function to calculate storage
+function calculateStorage() {
+    // IndexedDB storage sizes
+    calculateIndexedDBSize("FSMS_Participants_DB")
+        .then(size => {
+            participantsStorage.textContent = `Participants DB: ${formatSize(size)}`;
+        })
+        .catch(() => {
+            participantsStorage.textContent = "Participants DB: Unable to calculate";
+        });
+
+    calculateIndexedDBSize("FSMS_Schedule_Details_DB")
+        .then(size => {
+            scheduleStorage.textContent = `Schedule DB: ${formatSize(size)}`;
+        })
+        .catch(() => {
+            scheduleStorage.textContent = "Schedule DB: Unable to calculate";
+        });
+
+    // Total available storage (assume a quota of 50MB)
+    const quota = 50 * 1024 * 1024; // 50MB
+    navigator.storage.estimate().then(estimate => {
+        const used = estimate.usage || 0;
+        const remaining = quota - used;
+        availableStorage.textContent = `Available Storage: ${formatSize(remaining)}`;
+    });
+}
+
+// Helper function to calculate IndexedDB size
+function calculateIndexedDBSize(dbName) {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(dbName);
+        request.onsuccess = event => {
+            const db = event.target.result;
+            let totalSize = 0;
+
+            // Calculate size of all object stores
+            const transaction = db.transaction(db.objectStoreNames, 'readonly');
+            transaction.oncomplete = () => {
+                db.close();
+                resolve(totalSize);
+            };
+
+            transaction.onerror = () => reject();
+            for (const storeName of db.objectStoreNames) {
+                const store = transaction.objectStore(storeName);
+                const countRequest = store.getAll();
+
+                countRequest.onsuccess = () => {
+                    const records = countRequest.result;
+                    totalSize += JSON.stringify(records).length;
+                };
+
+                countRequest.onerror = () => reject();
+            }
+        };
+
+        request.onerror = () => reject();
+    });
+}
+
+// Helper function to format sizes
+function formatSize(bytes) {
+    if (bytes > 1024 * 1024) {
+        return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    } else if (bytes > 1024) {
+        return `${(bytes / 1024).toFixed(2)} KB`;
+    } else {
+        return `${bytes} Bytes`;
+    }
+}
+
+storageOption.addEventListener('click', () => {
+    // Get the dimensions and position of the storage option
+    const rect = storageOption.getBoundingClientRect();
+
+    // Calculate the position for the popup
+    storagePopup.style.top = `${rect.top + window.scrollY}px`; // Align vertically with the storage option
+    storagePopup.style.left = `${rect.left - storagePopup.offsetWidth - 100}px`; // Move to the left of the storage option with a 10px gap
+
+    // Ensure the popup doesn't exceed the screen's left boundary
+    if (storagePopup.getBoundingClientRect().left < 0) {
+        storagePopup.style.left = `${rect.right + 10}px`; // Move to the right of the storage option as fallback
+    }
+
+    // Show the popup
+    storagePopup.style.display = 'block';
+
+    // Fetch and update storage details
+    calculateStorage();
+});
+
+closeStoragePopup.addEventListener('click', () => {
+    storagePopup.style.display = 'none';
+});
+
+document.addEventListener('click', (event) => {
+    if (!storagePopup.contains(event.target) && event.target !== storageOption) {
+        storagePopup.style.display = 'none';
+    }
+});
+
 // Event Listeners
 searchBar.addEventListener("input", () => {
     updateSuggestions(searchBar.value);
@@ -729,5 +838,3 @@ participantListBtn.addEventListener("click", () => {
 window.onload = function () {
     initDB();
 };
-
-
