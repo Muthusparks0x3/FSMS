@@ -466,32 +466,38 @@ importScheduleFileInput.addEventListener("change", function(event) {
 
 //Import schedule details into DB function
 async function importCSVToScheduleDB(csvData) {
-    return new Promise((resolve, reject) => {
-        const dbName = "FSMS_Schedule_Details_DB";
-        const currentMonth = new Date().toLocaleString('default', { month: 'long' });
+    const selectedDate = dateField.value; // Get the selected date from the date input
+    if (!selectedDate) {
+        alert("Please select a date before importing the schedule.");
+        return;
+    }
 
+    const selectedMonth = new Date(selectedDate).toLocaleString('default', { month: 'long' }); // Get the month name
+    const dbName = "FSMS_Schedule_Details_DB";
+
+    return new Promise((resolve, reject) => {
         const request = indexedDB.open(dbName, dbVersion);
 
         request.onupgradeneeded = function (event) {
             const db = event.target.result;
-            if (!db.objectStoreNames.contains(currentMonth)) {
-                db.createObjectStore(currentMonth, { keyPath: 'date' });
+            if (!db.objectStoreNames.contains(selectedMonth)) {
+                db.createObjectStore(selectedMonth, { keyPath: 'date' });
+                console.log(`Object store for ${selectedMonth} created.`);
             }
         };
 
         request.onsuccess = function (event) {
             const db = event.target.result;
-            const transaction = db.transaction(currentMonth, "readwrite");
-            const store = transaction.objectStore(currentMonth);
+            const transaction = db.transaction(selectedMonth, "readwrite");
+            const store = transaction.objectStore(selectedMonth);
 
             // Split CSV data into rows and extract headers
             const rows = csvData.split('\n').filter(row => row.trim() !== '');
             const headers = rows[0].split(',').map(header => header.trim().toLowerCase());
 
-            // Mapping headers to keys used in IndexedDB
             const headerMap = {
                 date: "date",
-                "participantid": "participantID", // Ensure header matches exactly (case-insensitive)
+                participantid: "participantID",
                 participant: "participant",
                 breakfast: "breakfast",
                 "breakfast qty": "breakfastQuantity",
@@ -503,26 +509,20 @@ async function importCSVToScheduleDB(csvData) {
                 details: "details"
             };
 
-            // Create a dictionary to group data by date
             const scheduleByDate = {};
 
-            // Process each row (skip header row)
             rows.slice(1).forEach(row => {
                 const values = row.split(',').map(value => value.trim());
-                
-                // Dynamically map CSV data to object keys
                 const entry = {};
                 for (const [csvHeader, dbKey] of Object.entries(headerMap)) {
                     const index = headers.indexOf(csvHeader.toLowerCase());
                     entry[dbKey] = index !== -1 ? values[index] || '' : '';
                 }
 
-                // Ensure boolean conversion for meal columns
                 entry.breakfast = entry.breakfast.toLowerCase() === 'yes';
                 entry.lunch = entry.lunch.toLowerCase() === 'yes';
                 entry.dinner = entry.dinner.toLowerCase() === 'yes';
 
-                // Group by date
                 const date = entry.date;
                 if (date) {
                     if (!scheduleByDate[date]) {
@@ -532,24 +532,23 @@ async function importCSVToScheduleDB(csvData) {
                 }
             });
 
-            // Store grouped data in IndexedDB
             for (const [date, rowsData] of Object.entries(scheduleByDate)) {
                 store.put({ date, rowsData });
             }
 
             transaction.oncomplete = () => {
-                console.log("CSV schedule data imported successfully to IndexedDB.");
+                console.log(`CSV data imported successfully into ${selectedMonth}.`);
                 resolve();
             };
 
             transaction.onerror = (event) => {
-                console.error("Error importing schedule CSV to IndexedDB:", event.target.errorCode);
+                console.error(`Error importing schedule CSV to ${selectedMonth}:`, event.target.errorCode);
                 reject(event.target.errorCode);
             };
         };
 
         request.onerror = function (event) {
-            console.error("Error opening database for schedule import:", event.target.errorCode);
+            console.error("Error opening database:", event.target.errorCode);
             reject(event.target.errorCode);
         };
     });
