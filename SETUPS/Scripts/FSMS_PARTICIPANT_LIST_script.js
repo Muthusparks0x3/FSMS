@@ -3,6 +3,8 @@ const dbName = "FSMS_Participants_DB";
 const objectStoreName = "participants";
 let dbVersion;
 let db;
+// Store initial values when editing starts
+let originalParticipantData = {};
 
 // DOM elements
 const editNameInput = document.getElementById("editName");
@@ -17,10 +19,11 @@ const addParticipantPopup = document.getElementById("addParticipantPopup");
 const tableBody = document.getElementById("participantsTableBody");
 const scheduleButton = document.getElementById("scheduleButton");
 const searchBar = document.getElementById("searchBar");
-const searchButton = document.getElementById("searchButton");
 const suggestionsContainer = document.getElementById("suggestions");
 const addParticipantButton = document.getElementById("addParticipantButton");
 const totalParticipantsCount = document.getElementById("totalParticipants");
+const ExportPage = document.getElementById("Exportpage");
+
 // Open IndexedDB
 const request = indexedDB.open(dbName, dbVersion);
 
@@ -73,11 +76,12 @@ function populateTable(participants) {
     tableBody.innerHTML = ""; // Clear existing rows
 
     participants.sort((a, b) => a.name.localeCompare(b.name)); // Sort alphabetically
-    participants.forEach(participant => {
+    participants.forEach((participant, index) => {
         const row = document.createElement("tr");
         row.innerHTML = `
-            <td>${participant.participantID}</td>
+            <td>${index + 1}</td>  <!-- Auto-incremented Serial Number -->
             <td>${participant.name}</td>
+            <td>${participant.participantID}</td>
             <td>${participant.mobile}</td>
             <td>${participant.address}</td>
             <td><button onclick="editParticipant('${participant.participantID}')">Edit</button></td>
@@ -91,8 +95,8 @@ function populateTable(participants) {
 function editParticipant(participantID) {
     const normalizedParticipantID = participantID.toString();
 
-    const transaction = db.transaction(objectStoreName, "readonly");
-    const store = transaction.objectStore(objectStoreName);
+    const transaction = db.transaction("participants", "readonly");
+    const store = transaction.objectStore("participants");
 
     const request = store.get(normalizedParticipantID);
 
@@ -106,6 +110,9 @@ function editParticipant(participantID) {
 
             saveEditButton.dataset.participantId = fetchedParticipant.participantID;
             editParticipantPopup.style.display = "block";
+
+            // Store original data for comparison
+            originalParticipantData = { ...fetchedParticipant };
         } else {
             alert("Participant not found.");
         }
@@ -123,6 +130,11 @@ function saveParticipantChanges() {
     if (!participantID) {
         alert("Invalid participant ID.");
         return;
+    }
+
+    // Ask for confirmation before saving
+    if (!confirm("Are you sure you want to save the changes?")) {
+        return; // Cancel save if user selects "No"
     }
 
     const updatedParticipant = {
@@ -148,6 +160,18 @@ function saveParticipantChanges() {
     };
 }
 
+function closeEditPopup() {
+    editParticipantPopup.style.display = "none";
+}
+
+function hasChangesMade() {
+    return (
+        editNameInput.value.trim() !== originalParticipantData.name ||
+        editMobileInput.value.trim() !== originalParticipantData.mobile ||
+        editAddressInput.value.trim() !== originalParticipantData.address
+    );
+}
+
 function deleteParticipant(participantID) {
     const normalizedParticipantID = participantID.toString();
 
@@ -168,10 +192,6 @@ function deleteParticipant(participantID) {
             alert("Failed to delete participant. Please try again.");
         };
     }
-}
-
-function closeEditPopup() {
-    editParticipantPopup.style.display = "none";
 }
 
 async function deleteParticipantData(participantID) {
@@ -220,69 +240,22 @@ async function deleteParticipantData(participantID) {
     };
 }
 
-// Search Participants
-function searchParticipant() {
+// Filter participants in the table based on the search input
+function filterParticipants() {
     const query = searchBar.value.trim().toLowerCase();
     const rows = tableBody.querySelectorAll("tr");
-
-    if (!query) {
-        alert("Please enter a name to search.");
-        return;
-    }
-
-    let found = false;
 
     rows.forEach(row => {
-        const nameCell = row.cells[1]; // Name column
-        if (nameCell && nameCell.textContent.toLowerCase() === query) {
-            row.style.backgroundColor = "lightyellow"; // Highlight row
-            row.scrollIntoView({ behavior: "smooth", block: "center" });
-            found = true;
-        } else {
-            row.style.backgroundColor = ""; // Reset other rows
+        const nameCell = row.cells[1]; // Assuming the Name column is the second column
+        if (nameCell) {
+            const name = nameCell.textContent.toLowerCase();
+            if (name.includes(query)) {
+                row.style.display = ""; // Show matching rows
+            } else {
+                row.style.display = "none"; // Hide non-matching rows
+            }
         }
     });
-
-    if (!found) {
-        alert("No matching participant found.");
-    }
-}
-
-// Update Suggestions
-function updateSuggestions() {
-    const query = searchBar.value.trim().toLowerCase();
-    const rows = tableBody.querySelectorAll("tr");
-
-    // Clear previous suggestions
-    suggestionsContainer.innerHTML = "";
-
-    if (query) {
-        const suggestions = Array.from(rows)
-            .map(row => row.cells[1]?.textContent)
-            .filter(name => name && name.toLowerCase().startsWith(query))
-            .slice(0, 5); // Limit to 5 suggestions
-
-        if (suggestions.length > 0) {
-            suggestions.forEach(name => {
-                const suggestionItem = document.createElement("div");
-                suggestionItem.textContent = name;
-
-                // Select suggestion on click
-                suggestionItem.addEventListener("click", () => {
-                    searchBar.value = name;
-                    suggestionsContainer.style.display = "none";
-                });
-
-                suggestionsContainer.appendChild(suggestionItem);
-            });
-
-            suggestionsContainer.style.display = "block";
-        } else {
-            suggestionsContainer.style.display = "none";
-        }
-    } else {
-        suggestionsContainer.style.display = "none";
-    }
 }
 
 // Generate a Unique Participant ID
@@ -373,23 +346,25 @@ cancelParticipantButton.addEventListener("click", () => {
 // Attach Add Participant Functionality
 saveParticipantButton.addEventListener("click", addParticipant);
 
-cancelEditButton.addEventListener("click", closeEditPopup);
+cancelEditButton.addEventListener("click", () => {
+    if (hasChangesMade()) {
+        const userChoice = confirm("You have unsaved changes. Do you want to save them?");
+        if (userChoice) {
+            saveParticipantChanges(); // Save changes before closing
+        } else {
+            closeEditPopup(); // Close without saving
+        }
+    } else {
+        closeEditPopup(); // Simply close if no changes were made
+    }
+});
 
 scheduleButton.addEventListener("click", () => {
     window.location.href = "FSMS_MAIN.html";
 });
 
-// Event Listeners
-searchButton.addEventListener("click", searchParticipant);
-searchBar.addEventListener("keypress", (event) => {
-    if (event.key === "Enter") {
-        searchParticipant();
-        suggestionsContainer.style.display = "none";
-    }
+ExportPage.addEventListener('click', function(){ // Redirect to the login page
+    window.location.href = 'FSMS_EXPORT.html';
 });
-searchBar.addEventListener("input", updateSuggestions);
-document.addEventListener("click", (event) => {
-    if (!suggestionsContainer.contains(event.target) && event.target !== searchBar) {
-        suggestionsContainer.style.display = "none";
-    }
-});
+
+searchBar.addEventListener("input", filterParticipants);

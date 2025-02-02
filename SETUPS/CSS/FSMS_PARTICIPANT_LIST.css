@@ -47,9 +47,20 @@ button:hover {
     padding: 10px 20px;
     border-radius: 5px;
     cursor:pointer;
-    position: absolute;
+    position: fixed;
     top: 10px;
     left: 10px;
+    z-index: 100;
+}
+
+#Exportpage {
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor:pointer;
+    position: fixed;
+    top: 10px;
+    left: 125px;
     z-index: 100;
 }
 
@@ -175,17 +186,6 @@ tr {
     border-right: none;
 }
 
-#searchButton {
-    padding: 6px;
-    border: 1px solid #ccc;
-    background-color: #f8f8f8;
-    cursor: pointer;
-}
-
-#searchButton:hover {
-    background-color: #e0e0e0;
-}
-
 /* Suggestions Styles */
 #suggestions {
     position: absolute;
@@ -210,5 +210,5 @@ footer {
     margin-top: 20px;
     text-align: center;
     font-size: 0.9em;
-    color: #777; /* Grey color for footer text */
+    color: grey;
 }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Export Page</title>
+    <title>FSMS Export</title>
     <link rel="icon" href="Icons/Export_icon.png" type="image/png">
     <link rel="stylesheet" href="CSS/FSMS_EXPORT_style.css">
 </head>
@@ -12,6 +12,7 @@
 
     <!-- Schedule Button -->
     <button id="scheduleButton" class="top-left-button">Schedule</button>
+    <button id="participantListBtn">Participant list</button>
     <!-- Logout Button -->
     <button id="logoutButton" class="top-right-button">Logout</button>
     <!-- Settings icon -->
@@ -44,18 +45,18 @@
         </div>
     </div>
 
-    <!-- Main container -->
     <div class="main-container">
         <!-- Left container with search, dropdown, and buttons -->
         <div class="left-container">
-            <input type="text" id="search-bar" placeholder="Search by Name" onkeyup="searchParticipants()">
+            <input type="text" id="search-bar" placeholder="Search by Name">
+            <div id="suggestions-container" class="suggestions-container"></div>
             <div class="dropdown-container">
                 <select id="participant-dropdown"></select>
                 <select id="month-dropdown"></select>
             </div>
             <div class="buttons">
                 <button id="export-excel">Export Excel</button>
-                <button id="generate">Generate</button> <!-- New Generate button -->
+                <button id="generate">Generate</button>
                 <button id="export-pdf">Export PDF</button>
             </div>
         </div>

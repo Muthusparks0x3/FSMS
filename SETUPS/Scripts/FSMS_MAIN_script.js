@@ -13,9 +13,7 @@ const searchButton = document.getElementById("searchButton");
 const suggestionsContainer = document.getElementById("suggestions");
 const totalParticipants = document.getElementById('totalParticipants');
 const logoutbutton =  document.getElementById("logoutButton")
-// Get the refresh button element
 const refreshPageButton = document.getElementById('refreshPageBtn');
-// JavaScript to toggle the settings popup
 const settingsIcon = document.getElementById('settingsIcon');
 const settingsPopup = document.getElementById('settingsPopup');
 const exportOption = document.getElementById('exportOption');
@@ -23,10 +21,8 @@ const importOption = document.getElementById('importOption');
 const importOPtionsPopup = document.getElementById('importOptionsPopup');
 const exportOptionsPopup = document.getElementById('exportOptionsPopup');
 const exportParticipantDB = document.getElementById('exportParticipants');
-// Select the import option and file input elements
 const importParticipantsDB = document.getElementById("importParticipants");
 const importFileInput = document.getElementById("importFileInput");
-//Export page button
 const ExportPage = document.getElementById("Exportpage");
 //password modal
 const passwordModal = document.getElementById('passwordModal');
@@ -46,6 +42,7 @@ const SETTINGS_PASSWORD = "Helix@0x3";
 
 let db;
 let participants = []; // Ensure participants array is defined here
+let initialEditValues = {};
 
 // Initialize IndexedDB
 function initDB() {
@@ -111,7 +108,7 @@ function updateTotalParticipants(count) {
 // Update suggestions based on search input
 function updateSuggestions(query) {
     const filtered = participants.filter((p) =>
-        p.name.toLowerCase().startsWith(query.toLowerCase())
+        p.name.toLowerCase().includes(query.toLowerCase()) // Match names containing the query
     );
 
     suggestionsContainer.innerHTML = "";
@@ -122,7 +119,7 @@ function updateSuggestions(query) {
             suggestion.addEventListener("click", () => {
                 searchBar.value = participant.name;
                 suggestionsContainer.style.display = "none";
-                dispatchSearchEvent(participant.name);
+                filterTableRows(participant.name); // Filter the table based on the clicked suggestion
             });
             suggestionsContainer.appendChild(suggestion);
         });
@@ -130,12 +127,9 @@ function updateSuggestions(query) {
     } else {
         suggestionsContainer.style.display = "none";
     }
-}
 
-// Dispatch a custom event to trigger the search in FSMS_TABLE_script.js
-function dispatchSearchEvent(query) {
-    const searchEvent = new CustomEvent("searchParticipant", { detail: { query } });
-    document.dispatchEvent(searchEvent);
+    // Dynamically filter the table as the user types
+    filterTableRows(query);
 }
 
 // Function to generate a unique participantID starting from 100
@@ -238,6 +232,13 @@ function editParticipant() {
                     // Store the participantID for reference
                     editParticipantPopup.dataset.participantId = participant.participantID;
 
+                    // Store the initial values for comparison
+                    initialEditValues = {
+                        name: participant.name,
+                        mobile: participant.mobile,
+                        address: participant.address,
+                    };
+
                     // Show the edit popup
                     editParticipantPopup.style.display = "block";
                     return; // Stop further cursor iterations
@@ -300,6 +301,10 @@ function saveChanges() {
             console.error("Error saving participant details.");
             alert("Failed to save changes. Please try again.");
         };
+        editParticipantPopup.style.display = 'none';
+    }
+    else {
+        editParticipantPopup.style.display = 'block';
     }
 }
 
@@ -703,17 +708,6 @@ searchBar.addEventListener("keypress", (event) => {
     }
 });
 
-searchButton.addEventListener("click", () => {
-    const query = searchBar.value.trim();
-    if (query) {
-        dispatchSearchEvent(query);
-        suggestionsContainer.style.display = "none";
-    } else {
-        alert("Please enter a participant's name to search.");
-    }
-});
-
-
 // Show the password modal when the settings icon is clicked
 settingsIcon.addEventListener('click', () => {
     passwordModal.style.display = 'block';
@@ -804,9 +798,30 @@ saveParticipantBtn.onclick = () => {
 editParticipantBtn.onclick = editParticipant;
 saveChangesBtn.onclick = () => {
     saveChanges();
-    editParticipantPopup.style.display = 'none';
 };
-cancelEditPopup.onclick = () => editParticipantPopup.style.display = 'none';
+cancelEditPopup.onclick = () => {
+    // Get the current values from the form
+    const currentEditValues = {
+        name: document.getElementById("editName").value,
+        mobile: document.getElementById("editMobile").value,
+        address: document.getElementById("editAddress").value,
+    };
+
+    // Check if any changes were made
+    const changesMade =
+        currentEditValues.name !== initialEditValues.name ||
+        currentEditValues.mobile !== initialEditValues.mobile ||
+        currentEditValues.address !== initialEditValues.address;
+
+    if (changesMade) {
+        if (confirm("Are you sure to cancel the changes made?")) {
+            editParticipantPopup.style.display = "none";
+        }
+    } else {
+        // Close the popup without confirmation if no changes were made
+        editParticipantPopup.style.display = "none";
+    }
+};
 deleteParticipantBtn.onclick = () => {
     deleteParticipant();
     editParticipantPopup.style.display = 'none';
@@ -830,7 +845,7 @@ logoutbutton.addEventListener("click", () => {
 });
 
 //participant list
-participantListBtn.addEventListener("click", () => {
+participantlistbtn.addEventListener("click", () => {
     window.location.href = "FSMS_PARTICIPANT_LIST.html"; // Redirect to the participant list page
 });
 
@@ -838,3 +853,5 @@ participantListBtn.addEventListener("click", () => {
 window.onload = function () {
     initDB();
 };
+
+

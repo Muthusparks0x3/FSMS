@@ -1,30 +1,3 @@
-/* Array of background images */
-const backgrounds = [
-    'Images/img8.jpg',
-    'Images/img11.jpg',
-    'Images/img13.jpg'
-];
-
-// Function to change background image on page load
-function changeBackgroundOnLoad() {
-    const randomIndex = Math.floor(Math.random() * backgrounds.length);
-    document.body.style.backgroundImage = `url(${backgrounds[randomIndex]})`;
-}
-
-// Function to change background image at intervals
-function changeBackgroundInterval() {
-    let index = 0;
-    setInterval(() => {
-        index = (index + 1) % backgrounds.length;
-        document.body.style.backgroundImage = `url(${backgrounds[index]})`;
-    }, 15000); // Change image every 15 seconds
-}
-
-// Call functions on page load
-window.onload = function() {
-    changeBackgroundOnLoad();
-    changeBackgroundInterval();
-};
 // Function to toggle password visibility
 function togglePasswordVisibility(passwordFieldId, checkboxId) {
     const passwordField = document.getElementById(passwordFieldId);

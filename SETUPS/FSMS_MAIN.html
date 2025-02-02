@@ -10,18 +10,19 @@
 <body>
     <h1>Food Schedule Management System</h1>
 
-    <!-- Logout Button -->
-    <button id="logoutButton" class="top-right-button">Logout</button>
-    <!-- Password Modal -->
-    <div id="passwordModal">
+    <div class="logo">
+        <img src="LOGO/Helix_logo.png" alt="Logo">
+    </div>
+    
+    <button id="logoutButton" class="top-right-button">Logout</button> <!-- Logout Button -->
+    <div id="passwordModal"><!-- Password Modal -->
     <h3>Enter Password</h3>
         <input type="password" id="settingsPassword" placeholder="Enter password">
         <button id="cancelPasswordBtn">Cancel</button>
     </div>
-    <!-- Settings icon -->
-    <span class="settings-icon" id="settingsIcon">⚙️</span>    
-    <!-- Settings Popup -->
-    <div class="settings-popup" id="settingsPopup">
+
+    <span class="settings-icon" id="settingsIcon">⚙️</span>    <!-- Settings icon -->    
+    <div class="settings-popup" id="settingsPopup">    <!-- Settings Popup -->
         <ul>
             <li id="importOption">Import</li>
             <li id="exportOption">Export</li>
@@ -62,7 +63,6 @@
             <button id="participantListBtn">Participant list</button>
             <div id="searchSection">
                 <input type="text" id="searchBar" placeholder="Search participant...">
-                <button id="searchButton">🔍</button>
                 <div id="suggestions"></div>
             </div>
             

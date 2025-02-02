@@ -3,10 +3,8 @@ body {
     font-family: 'Arial', sans-serif; /* Sets the default font for the page */
     margin: 0;
     padding: 0;
-    background-size: auto cover; /* Ensures the background image covers the entire page */
-    background-position: center;
-    transition: background-image 15s ease-in-out; /* Smooth transition between background images */
-    background-repeat: no-repeat;
+    background-image: url('../Images/img8.jpg'); /* Set the static background image */
+    background-size: cover; /* Ensures the background image covers the entire page */
 }
 
 /* Logo container styling */
@@ -110,5 +108,5 @@ footer {
     margin-top: 20px;
     text-align: center;
     font-size: 0.9em;
-    color: #777; /* Grey color for footer text */
+    color: white;
 }

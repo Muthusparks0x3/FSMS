@@ -142,41 +142,43 @@ async function saveTableDataToIndexedDB() {
         return;
     }
 
-    // Fetch participants with their IDs
     const participants = await getParticipants();
+    const monthStore = new Date(date).toLocaleString('default', { month: 'long' });
 
+    const invalidIDs = []; // Track invalid participant IDs
     const rowsData = Array.from(tableBody.rows).map(row => {
-        const participantName = row.cells[0].innerText;
-        // Find the participant ID for the current row's participant
-        const participant = participants.find(p => p.name === participantName);
+        const participantIDCell = row.dataset.participantId; // Use data attribute for participantID
+        const participant = participants.find(p => p.participantID === participantIDCell);
+
         if (!participant) {
-            console.error(`Participant ID not found for ${participantName}`);
-            return null; // If participant not found, skip this row
+            invalidIDs.push(participantIDCell); // Add to invalid IDs
+            return null; // Skip this row
         }
 
         return {
-            participantID: participant.participantID, // Store the participantID
-            participant: participantName, // Store the participant name
+            participantID: participant.participantID,
+            participant: participant.name, // Save name for display purposes
             breakfast: row.cells[1].querySelector('input').checked,
-            breakfastQuantity: row.cells[2].querySelector('input').value,
+            breakfastQuantity: parseInt(row.cells[2].querySelector('input').value) || 0,
             lunch: row.cells[3].querySelector('input').checked,
-            lunchQuantity: row.cells[4].querySelector('input').value,
+            lunchQuantity: parseInt(row.cells[4].querySelector('input').value) || 0,
             dinner: row.cells[5].querySelector('input').checked,
-            dinnerQuantity: row.cells[6].querySelector('input').value,
-            extras: row.cells[7].querySelector('input').value,
-            details: row.cells[8].querySelector('input').value,
+            dinnerQuantity: parseInt(row.cells[6].querySelector('input').value) || 0,
+            extras: parseFloat(row.cells[7].querySelector('input').value) || 0,
+            details: row.cells[8].querySelector('input').value || '',
         };
-    }).filter(row => row !== null); // Filter out any rows where participantID was not found
+    }).filter(row => row !== null); // Exclude invalid rows
+
+    // Notify the user about invalid participant IDs
+    if (invalidIDs.length > 0) {
+        alert(`The following participant IDs are invalid and could not be saved:\n\n${invalidIDs.join('\n')}`);
+        return; // Stop the save process
+    }
 
     if (rowsData.length === 0) {
         alert('No valid rows to save.');
         return;
     }
-
-    // Sort rows by participant name before saving
-    rowsData.sort((a, b) => a.participant.localeCompare(b.participant));
-
-    const monthStore = new Date(date).toLocaleString('default', { month: 'long' });
 
     try {
         const db = await initIndexedDB(date);
@@ -184,19 +186,34 @@ async function saveTableDataToIndexedDB() {
         const transaction = db.transaction(monthStore, 'readwrite');
         const store = transaction.objectStore(monthStore);
 
-        // Save the rowsData into the store
-        store.put({ date, rowsData });
+        const existingData = await new Promise((resolve, reject) => {
+            const request = store.get(date);
+            request.onsuccess = () => resolve(request.result || { date, rowsData: [] });
+            request.onerror = (e) => reject(e);
+        });
+
+        // Merge existing and new data based on participantID
+        const combinedData = [
+            ...existingData.rowsData.filter(
+                existingRow => !rowsData.some(newRow => newRow.participantID === existingRow.participantID)
+            ),
+            ...rowsData,
+        ];
+
+        store.put({ date, rowsData: combinedData });
 
         transaction.oncomplete = () => {
-            console.log('Transaction completed. Data has been stored.');
-            alert('Table data saved.');
+            console.log('All rows saved successfully:', combinedData);
+            alert('Table data saved successfully.');
         };
 
         transaction.onerror = (e) => {
-            console.error('Error saving data to IndexedDB.', e);
+            console.error('Transaction error:', e);
+            alert('Error saving table data. Please try again.');
         };
     } catch (error) {
-        console.error('Failed to save table data:', error);
+        console.error('Error saving table data:', error);
+        alert('An unexpected error occurred while saving.');
     }
 }
 
@@ -211,8 +228,8 @@ async function loadTableData() {
     const monthStore = new Date(date).toLocaleString('default', { month: 'long' });
 
     try {
-        const db = await initIndexedDB(date); // Ensure object store exists
-        const participants = await getParticipants(); // Get all current participants
+        const db = await initIndexedDB(date);
+        const participants = await getParticipants();
 
         const transaction = db.transaction(monthStore, 'readonly');
         const store = transaction.objectStore(monthStore);
@@ -222,12 +239,10 @@ async function loadTableData() {
             const savedData = event.target.result ? event.target.result.rowsData : [];
             const savedParticipantIDs = savedData.map(row => row.participantID);
 
-            // Identify missing participants
             const missingParticipants = participants.filter(
                 participant => !savedParticipantIDs.includes(participant.participantID)
             );
 
-            // Populate default rows for missing participants
             const defaultRows = missingParticipants.map(participant => ({
                 participantID: participant.participantID,
                 participant: participant.name,
@@ -238,12 +253,12 @@ async function loadTableData() {
                 dinner: false,
                 dinnerQuantity: 0,
                 extras: 0,
-                details: ''
+                details: '',
             }));
 
-            // Merge saved data with default rows
-            const combinedData = [...savedData, ...defaultRows].sort((a, b) => 
-                a.participant.localeCompare(b.participant));
+            const combinedData = [...savedData, ...defaultRows].sort((a, b) =>
+                a.participant.localeCompare(b.participant)
+            );
             populateTableWithData(combinedData);
         };
 
@@ -260,7 +275,7 @@ async function loadTableData() {
 function populateTableWithData(rowsData) {
     tableBody.innerHTML = ''; // Clear existing rows
 
-    if (!rowsData) {
+    if (!rowsData || rowsData.length === 0) {
         console.warn('No data found for the selected date. Loading default rows.');
         populateTableRows(); // Load default rows if no data
         return;
@@ -268,6 +283,7 @@ function populateTableWithData(rowsData) {
 
     rowsData.forEach((rowData) => {
         let row = document.createElement('tr');
+        row.setAttribute('data-participant-id', rowData.participantID); // Attach participantID to the row
         row.innerHTML = `
             <td>${rowData.participant}</td>
             <td><input type="checkbox" class="meal-checkbox" ${rowData.breakfast ? 'checked' : ''} /></td>
@@ -286,7 +302,6 @@ function populateTableWithData(rowsData) {
 }
 
 // Export and reset function
-// Function to open the schedule database
 async function openScheduleDB() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open('FSMS_Schedule_Details_DB', dbVersion);
@@ -554,34 +569,49 @@ async function importCSVToScheduleDB(csvData) {
     });
 }
 
-function highlightParticipantRow(name) {
-    const rows = tableBody.querySelectorAll("tr");
-    let found = false;
+function filterTableRows(query) {
+    const rows = Array.from(tableBody.querySelectorAll("tr")); // Convert NodeList to Array for sorting
 
-    rows.forEach((row) => {
+    if (!query.trim()) {
+        // Reset: Show all rows in their original order when the query is empty
+        rows.forEach((row) => (row.style.display = ""));
+        return;
+    }
+
+    // Filter rows that match the query
+    const filteredRows = rows.filter((row) => {
         const participantNameCell = row.cells[0]; // Assuming the first column contains participant names
-        if (
-            participantNameCell &&
-            participantNameCell.textContent.toLowerCase() === name.toLowerCase()
-        ) {
-            row.style.backgroundColor = "lightyellow"; // Highlight row
-            row.scrollIntoView({ behavior: "smooth", block: "center" });
-            found = true;
-        } else {
-            row.style.backgroundColor = ""; // Reset background for other rows
+        if (participantNameCell) {
+            const participantName = participantNameCell.textContent.toLowerCase();
+            return participantName.includes(query.toLowerCase());
         }
+        return false;
     });
 
-    if (!found) {
-        alert("Participant not found in the table.");
-    }
-}
+    // Sort filtered rows: Alphabetical order first, then matches elsewhere in the name
+    filteredRows.sort((a, b) => {
+        const nameA = a.cells[0].textContent.toLowerCase();
+        const nameB = b.cells[0].textContent.toLowerCase();
+        const queryLower = query.toLowerCase();
 
-// Listen for the custom search event
-document.addEventListener("searchParticipant", (event) => {
-    const query = event.detail.query;
-    highlightParticipantRow(query);
-});
+        const startsWithA = nameA.startsWith(queryLower);
+        const startsWithB = nameB.startsWith(queryLower);
+
+        // Prioritize alphabetical order
+        if (nameA < nameB) return -1;
+        if (nameA > nameB) return 1;
+
+        // If equal alphabetically, prioritize exact matches
+        if (startsWithA && !startsWithB) return -1;
+        if (!startsWithA && startsWithB) return 1;
+
+        return 0; // Maintain relative order if both are equal
+    });
+
+    // Hide all rows, then show filtered rows in the correct order
+    rows.forEach((row) => (row.style.display = "none")); // Hide all rows
+    filteredRows.forEach((row) => (row.style.display = "")); // Show filtered rows
+}
 
 // Add event listener to trigger the file input dialog when "Import Schedule" is clicked
 importScheduleDB.addEventListener("click", () => {
@@ -609,5 +639,10 @@ dateField.addEventListener('change', () => {
 
 saveTableButton.addEventListener('click', saveTableDataToIndexedDB);
 savetablebtnbottom.addEventListener('click',saveTableDataToIndexedDB)
-resetTableButton.addEventListener('click', resetTableData);
+resetTableButton.addEventListener("click", () => {
+    if (confirm("Are you sure you want to reset the table? This action cannot be undone.")) {
+        resetTableData();
+    }
+});
+
 

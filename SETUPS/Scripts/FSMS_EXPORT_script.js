@@ -15,8 +15,9 @@ const lunchAmountInput = document.getElementById("lunchAmount");
 const dinnerAmountInput = document.getElementById("dinnerAmount");
 const updateButton = document.getElementById("updateAmount");
 const cancelButton = document.getElementById("cancelAmount");
-const schedulebutton = document.getElementById("scheduleButton")
-const logoutbutton =  document.getElementById("logoutButton")
+const schedulebutton = document.getElementById("scheduleButton");
+const logoutbutton =  document.getElementById("logoutButton");
+const participantlistbtn = document.getElementById("participantListBtn")
 // Variables for summary table elements
 const summaryTable = document.querySelector(".summary-table");
 const breakfastQuantityElement = document.getElementById("breakfastQuantity");
@@ -27,8 +28,8 @@ const dinnerQuantityElement = document.getElementById("dinnerQuantity");
 const dinnerAmountElement = document.getElementById("dinner-Amount");
 const extraAmountElement = document.getElementById("extraAmount");
 const totalAmountElement = document.getElementById("totalAmount");
-const excelbutton = document.getElementById("export-excel")
-const pdfbutton = document.getElementById("export-pdf")
+const excelbutton = document.getElementById("export-excel");
+const pdfbutton = document.getElementById("export-pdf");
 // Disable Export buttons initially
 excelbutton.disabled = true;
 pdfbutton.disabled = true;
@@ -37,6 +38,10 @@ pdfbutton.disabled = true;
 searchBar.placeholder = "Search Participant";
 participantDropdown.innerHTML = "<option value='' disabled selected>Select Participant</option>";
 monthDropdown.innerHTML = "<option value='' disabled selected>Select Month</option>";
+
+let oldBreakfastAmount = localStorage.getItem("breakfastAmount") || 40;
+let oldLunchAmount = localStorage.getItem("lunchAmount") || 70;
+let oldDinnerAmount = localStorage.getItem("dinnerAmount") || 40;
 
 // IndexedDB initialization function
 let db;
@@ -123,16 +128,22 @@ function displayParticipantDetails(participantID) {
 
     const transaction = db.transaction("participants", "readonly");
     const store = transaction.objectStore("participants");
-    const index = store.index("name_id"); // Access the index created for participantID
 
-    // Fetch the participant based on the participantID using the index
-    const request = index.getAll();
+    // Directly fetch the participant using participantID as the key
+    const request = store.get(participantID);
 
-    request.onsuccess = function() {
-        const participants = request.result;
-        const participant = participants.find(p => p.participantID == participantID); // Match participantID
+    request.onsuccess = function () {
+        const participant = request.result;
 
         if (participant) {
+            // Ensure the container exists
+            const participantDetailsContainer = document.getElementById("participant-details");
+            if (!participantDetailsContainer) {
+                console.error("Participant details container not found in the DOM.");
+                return;
+            }
+
+            // Update the participant details container
             participantDetailsContainer.innerHTML = `
                 <p><strong>Participant ID:</strong> ${participant.participantID}</p>
                 <p><strong>Name:</strong> ${participant.name}</p>
@@ -140,55 +151,93 @@ function displayParticipantDetails(participantID) {
                 <p><strong>Address:</strong> ${participant.address || "N/A"}</p>
             `;
 
-            // Store the participant name and mobile in localStorage
+            // Optionally store the participant name and mobile in localStorage
+            localStorage.setItem("participantID", participant.participantID);
             localStorage.setItem("participantName", participant.name);
             localStorage.setItem("participantMobile", participant.mobile || "N/A");
         } else {
+            console.warn(`Participant with ID ${participantID} not found.`);
+            const participantDetailsContainer = document.getElementById("participant-details");
             participantDetailsContainer.innerHTML = "<p>Participant not found.</p>";
         }
     };
 
-    request.onerror = function() {
-        console.error("Failed to fetch participant details.");
+    request.onerror = function (event) {
+        console.error("Error fetching participant details:", event.target.error);
     };
 }
 
 // Search participants based on input
-function searchParticipants() {
-    const query = searchBar.value.toLowerCase();
+async function searchParticipants() {
+    const query = searchBar.value.toLowerCase().trim();
+    const suggestionsContainer = document.getElementById("suggestions-container");
     participantDropdown.innerHTML = "<option value='' disabled selected>Select Participant</option>";
+    suggestionsContainer.innerHTML = ""; // Clear previous suggestions
 
-    fetchParticipants()
-        .then(participants => {
-            // Filter participants whose names start with the search query
-            const matchingParticipants = participants.filter(participant =>
-                participant.name.toLowerCase().startsWith(query)
-            );
+    // Hide suggestions if search bar is empty
+    if (query === "") {
+        suggestionsContainer.style.display = "none";
+        return;
+    }
 
-            // Display a message if no results are found
-            if (matchingParticipants.length === 0) {
-                participantDropdown.innerHTML += "<option disabled>No results found</option>";
-            } else {
-                // Add matching participants to the dropdown
-                matchingParticipants.forEach(participant => {
-                    const option = document.createElement('option');
-                    option.value = participant.participantID;
-                    option.textContent = participant.name;
-                    participantDropdown.appendChild(option);
+    try {
+        const participants = await fetchParticipants();
+
+        // Filter participants for suggestions (Allow single-letter)
+        let filteredParticipants = participants
+            .filter(p => p.name.toLowerCase().includes(query))
+            .sort((a, b) => {
+                const nameA = a.name.toLowerCase();
+                const nameB = b.name.toLowerCase();
+
+                // Priority to names starting with query
+                const startsWithA = nameA.startsWith(query);
+                const startsWithB = nameB.startsWith(query);
+                if (startsWithA && !startsWithB) return -1;
+                if (!startsWithA && startsWithB) return 1;
+
+                return nameA.localeCompare(nameB); // Sort alphabetically
+            });
+
+        // Populate suggestions box
+        if (filteredParticipants.length > 0) {
+            filteredParticipants.forEach(participant => {
+                const suggestion = document.createElement("div");
+                suggestion.textContent = participant.name;
+                suggestion.addEventListener("click", () => {
+                    searchBar.value = participant.name; // Set search field
+                    suggestionsContainer.style.display = "none"; // Hide suggestions
+                    updateDropdown(filteredParticipants); // Filter dropdown based on selection
                 });
-            }
-        })
-        .catch(error => console.error(error));
+                suggestionsContainer.appendChild(suggestion);
+            });
+
+            suggestionsContainer.style.display = "block"; // Show suggestions
+        } else {
+            suggestionsContainer.style.display = "none"; // Hide if no matches
+        }
+
+        // Always update dropdown
+        updateDropdown(filteredParticipants);
+    } catch (error) {
+        console.error("Error fetching participants:", error);
+    }
 }
 
-// Event listeners for search and dropdown selection
+// Update dropdown based on filtered names
+function updateDropdown(filteredParticipants) {
+    participantDropdown.innerHTML = "<option value='' disabled selected>Select Participant</option>";
+
+    filteredParticipants.forEach(participant => {
+        const option = document.createElement("option");
+        option.value = participant.participantID;
+        option.textContent = participant.name;
+        participantDropdown.appendChild(option);
+    });
+}
+
+// Event listener for search input
 searchBar.addEventListener("input", searchParticipants);
-participantDropdown.addEventListener("change", function() {
-    const participantID = participantDropdown.value;
-    if (participantID) {
-        displayParticipantDetails(participantID);
-    }
-});
 
 // Fetch schedule data based on month and participant selection
 async function fetchScheduleData(selectedMonth, participantID) {
@@ -337,39 +386,44 @@ function updateSummaryTable() {
     summaryTable.style.display = "block";
 }
 
-// Function to export schedule and summary tables to Excel
+//Function to export bill in excel
 function exportToExcel() {
     // Create a new workbook and worksheet
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([]);
 
-    // Retrieve participant details from localStorage
-    const participantDetails = {
-        Name: localStorage.getItem("participantName") || "N/A",
-        Mobile: localStorage.getItem("participantMobile") || "N/A"
-    };
+    // Retrieve selected participant details
+    const selectedParticipantID = participantDropdown.value;
+    const selectedMonth = monthDropdown.value;
 
-    // Get the current month and participant name
-    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
-    const fileName = `${participantDetails.Name}_${currentMonth}_Food_Schedule_Bill.xlsx`;
+    if (!selectedParticipantID || !selectedMonth) {
+        alert("Please select a participant and month to export the Excel file.");
+        return;
+    }
 
-    // Add title
-    const title = `A to Z Food Service ${currentMonth} Bill`;
+    const participantName = participantDropdown.options[participantDropdown.selectedIndex].textContent;
+    const participantMobile = localStorage.getItem("participantMobile") || "N/A";
+
+    // Set the filename
+    const fileName = `${participantName}_${selectedMonth}_Food_Schedule_Bill.xlsx`;
+
+    // Add Title
+    const title = `A to Z Food Service ${selectedMonth} Bill`;
     XLSX.utils.sheet_add_aoa(ws, [[title]], { origin: "A1" });
-    ws["!merges"] = [{ s: { c: 0, r: 0 }, e: { c: 3, r: 0 } }]; // Merge cells for the title
+    ws["!merges"] = [{ s: { c: 0, r: 0 }, e: { c: 3, r: 0 } }];
 
-    // Add Participant Details section
+    // Add Participant Details
     const participantData = [
         ["Participant Details"],
-        ["Name", participantDetails.Name],
-        ["Mobile", participantDetails.Mobile]
+        ["Name", participantName],
+        ["Mobile", participantMobile]
     ];
     XLSX.utils.sheet_add_aoa(ws, participantData, { origin: "A3" });
 
-    // Set starting row for Schedule Table
+    // Set the starting row for Schedule Table
     let currentRow = participantData.length + 4;
 
-    // Function to extract table data as array of arrays
+    // Function to extract table data as an array of arrays
     function extractTableData(table) {
         const rows = Array.from(table.querySelectorAll("tr"));
         return rows.map(row => Array.from(row.querySelectorAll("td, th")).map(cell => cell.innerText));
@@ -379,9 +433,14 @@ function exportToExcel() {
     const scheduleTable = document.querySelector(".meal-table");
     if (scheduleTable) {
         const scheduleData = extractTableData(scheduleTable);
-        XLSX.utils.sheet_add_aoa(ws, [["Schedule Table"]], { origin: `A${currentRow}` });
-        XLSX.utils.sheet_add_aoa(ws, scheduleData, { origin: `A${currentRow + 1}` });
-        currentRow += scheduleData.length + 3;
+
+        if (scheduleData.length > 1) { // Ensure data is present
+            XLSX.utils.sheet_add_aoa(ws, [["Schedule Table"]], { origin: `A${currentRow}` });
+            XLSX.utils.sheet_add_aoa(ws, scheduleData, { origin: `A${currentRow + 1}` });
+            currentRow += scheduleData.length + 3;
+        } else {
+            console.warn("No schedule data found for the selected participant.");
+        }
     } else {
         console.error("Meal table not found in the DOM.");
     }
@@ -390,38 +449,26 @@ function exportToExcel() {
     const summaryTable = document.querySelector(".summary-table");
     if (summaryTable) {
         const summaryData = extractTableData(summaryTable);
-        XLSX.utils.sheet_add_aoa(ws, [["Summary Table"]], { origin: `A${currentRow}` });
-        XLSX.utils.sheet_add_aoa(ws, summaryData, { origin: `A${currentRow + 1}` });
-        currentRow += summaryData.length + 3;
+
+        if (summaryData.length > 1) { // Ensure data is present
+            XLSX.utils.sheet_add_aoa(ws, [["Summary Table"]], { origin: `A${currentRow}` });
+            XLSX.utils.sheet_add_aoa(ws, summaryData, { origin: `A${currentRow + 1}` });
+            currentRow += summaryData.length + 3;
+        } else {
+            console.warn("No summary data found for the selected participant.");
+        }
     } else {
         console.error("Summary table not found in the DOM.");
     }
 
     // Add Company Details at the bottom
     const companyDetails = [
-        [],
-        ["Company Name: Helix Services"],
-        ["Contact: muthulakshmananchellappan@gmail.com"],
-        ["Phone: +91 7708303969"]
+        ["A TO Z FOOD SERVICES"],
+        ["Phone: +91 9941935517. PAY TO THIS MOBILE NUMBER"],
+        ["DEVELOPED BY HELIX"],
+        ["For any app development contact muthulakshmananchellappan@gmail.com"]
     ];
     XLSX.utils.sheet_add_aoa(ws, companyDetails, { origin: `A${currentRow}` });
-
-    // Add outline borders
-    const range = XLSX.utils.decode_range(ws['!ref']);
-    for (let R = range.s.r; R <= range.e.r; ++R) {
-        for (let C = range.s.c; C <= range.e.c; ++C) {
-            const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
-            if (cell) {
-                cell.s = cell.s || {};
-                cell.s.border = {
-                    top: { style: "thin", color: { rgb: "000000" } },
-                    bottom: { style: "thin", color: { rgb: "000000" } },
-                    left: { style: "thin", color: { rgb: "000000" } },
-                    right: { style: "thin", color: { rgb: "000000" } }
-                };
-            }
-        }
-    }
 
     // Append the worksheet and save the file
     XLSX.utils.book_append_sheet(wb, ws, "Food Schedule Bill");
@@ -433,26 +480,33 @@ function exportToPDF() {
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF();
 
-    // Retrieve participant details from localStorage
-    const participantDetails = {
-        Name: localStorage.getItem("participantName") || "N/A",
-        Mobile: localStorage.getItem("participantMobile") || "N/A"
-    };
+    // Retrieve participant details from dropdowns
+    const selectedParticipantID = participantDropdown.value;
+    const selectedMonth = monthDropdown.value;
 
-    // Get current month and participant name for the file name
-    const currentMonth = new Date().toLocaleString('default', { month: 'long' });
-    const fileName = `${participantDetails.Name}_${currentMonth}_Food_Schedule_Bill.pdf`;
+    // Check if participant and month are selected
+    if (!selectedParticipantID || !selectedMonth) {
+        alert("Please select a participant and month to export the PDF.");
+        return;
+    }
+
+    // Retrieve participant details from localStorage or database
+    const participantName = participantDropdown.options[participantDropdown.selectedIndex].textContent;
+    const participantMobile = localStorage.getItem("participantMobile") || "N/A";
+
+    // Set the filename with the selected participant and month
+    const fileName = `${participantName}_${selectedMonth}_Food_Schedule_Bill.pdf`;
 
     // Add Title
-    const title = `A to Z Food Service ${currentMonth} Bill`;
+    const title = `A to Z Food Service - ${selectedMonth} Bill`;
     pdf.setFontSize(16);
     pdf.text(title, pdf.internal.pageSize.getWidth() / 2, 20, { align: "center" });
 
     // Add Participant Details
     pdf.setFontSize(12);
     pdf.text("Participant Details", 10, 40);
-    pdf.text(`Name: ${participantDetails.Name}`, 10, 50);
-    pdf.text(`Mobile: ${participantDetails.Mobile}`, 10, 60);
+    pdf.text(`Name: ${participantName}`, 10, 50);
+    pdf.text(`Mobile: ${participantMobile}`, 10, 60);
 
     let currentY = 70; // Starting Y position after participant details
 
@@ -499,9 +553,10 @@ function exportToPDF() {
     // Add Company Details at the bottom
     pdf.setFontSize(10);
     currentY = pdf.internal.pageSize.getHeight() - 30;
-    pdf.text("Company Name: Helix Services", 10, currentY);
-    pdf.text("Contact: muthulakshmananchellappan@gmail.com", 10, currentY + 10);
-    pdf.text("Phone: +91 7708303969", 10, currentY + 20);
+    pdf.text("A TO Z FOOD SERVICES", 10, currentY);
+    pdf.text("Phone: +91 9941935517. PAY TO THIS MOBILE NUMBER", 10, currentY + 5);
+    pdf.text("DEVELOPED BY HELIX", 10, currentY + 10);
+    pdf.text("For any app development contact muthulakshmananchellappan@gmail.com", 10, currentY + 15);
 
     // Save the PDF
     pdf.save(fileName);
@@ -523,10 +578,6 @@ function checkTablePopulation() {
 
 // Event listener for the update button
 updateButton.addEventListener("click", () => {
-    const oldBreakfastAmount = localStorage.getItem("breakfastAmount") || 40;
-    const oldLunchAmount = localStorage.getItem("lunchAmount") || 70;
-    const oldDinnerAmount = localStorage.getItem("dinnerAmount") || 40;
-
     const newBreakfastAmount = breakfastAmountInput.value;
     const newLunchAmount = lunchAmountInput.value;
     const newDinnerAmount = dinnerAmountInput.value;
@@ -539,17 +590,16 @@ updateButton.addEventListener("click", () => {
         localStorage.setItem("lunchAmount", newLunchAmount);
         localStorage.setItem("dinnerAmount", newDinnerAmount);
 
-        // Provide feedback to the user
+        // Update old values to match the new ones
+        oldBreakfastAmount = newBreakfastAmount;
+        oldLunchAmount = newLunchAmount;
+        oldDinnerAmount = newDinnerAmount;
+
         alert("Amounts updated successfully!");
-        // Refresh the page
-        location.reload();
+        location.reload(); // Refresh the page to reflect changes
     } else {
         alert("Update cancelled.");
     }
-    // Log changes to the console
-    console.log(`Breakfast amount changed from ${oldBreakfastAmount} to ${newBreakfastAmount}`);
-    console.log(`Lunch amount changed from ${oldLunchAmount} to ${newLunchAmount}`);
-    console.log(`Dinner amount changed from ${oldDinnerAmount} to ${newDinnerAmount}`);
 });
 
 // Event listener for the "Generate" button
@@ -590,7 +640,31 @@ changeAmountOption.addEventListener("click", () => {
 
 // Event listener to close the Change Amount popup
 cancelButton.addEventListener("click", () => {
-    changeAmountPopup.style.display = "none";
+    const currentBreakfast = breakfastAmountInput.value;
+    const currentLunch = lunchAmountInput.value;
+    const currentDinner = dinnerAmountInput.value;
+
+    // Check if any changes were made
+    const changesMade = 
+        currentBreakfast !== oldBreakfastAmount.toString() || 
+        currentLunch !== oldLunchAmount.toString() || 
+        currentDinner !== oldDinnerAmount.toString();
+
+    if (changesMade) {
+        const confirmCancel = confirm("Changes were made. Do you want to discard them?");
+        if (confirmCancel) {
+            // Restore old values
+            breakfastAmountInput.value = oldBreakfastAmount;
+            lunchAmountInput.value = oldLunchAmount;
+            dinnerAmountInput.value = oldDinnerAmount;
+
+            alert("Changes discarded.");
+            changeAmountPopup.style.display = "none"; // Close the popup
+        }
+        // If user selects "No," do nothing (popup remains open)
+    } else {
+        changeAmountPopup.style.display = "none"; // Close the popup if no changes
+    }
 });
 
 // Add event listeners to Export buttons to show appropriate messages
@@ -618,7 +692,10 @@ participantDropdown.addEventListener("change", () => {
     tableBody.innerHTML = "";
     excelbutton.disabled = true;
     pdfbutton.disabled = true;
-
+    const participantID = participantDropdown.value;
+    if (participantID) {
+        displayParticipantDetails(participantID);
+    }
     // Clear summary table
     summaryTable.style.display = "none";
     participantDetailsContainer.innerHTML = ""; // Reset participant details
@@ -642,6 +719,10 @@ logoutbutton.addEventListener("click", () => {
     // Add functionality for Logout button
     alert("Logging out...");
     window.location.href = "FSMS_LOGIN.html"; // Redirect to the login page
+});
+
+participantlistbtn.addEventListener("click", () => {
+    window.location.href = "FSMS_PARTICIPANT_LIST.html"; // Redirect to the participant list page
 });
 
 // Initialize the database and load initial data
