@@ -145,65 +145,54 @@ async function saveTableDataToIndexedDB() {
     const participants = await getParticipants();
     const monthStore = new Date(date).toLocaleString('default', { month: 'long' });
 
-    const invalidIDs = []; // Track invalid participant IDs
-    const rowsData = Array.from(tableBody.rows).map(row => {
-        const participantIDCell = row.dataset.participantId; // Use data attribute for participantID
-        const participant = participants.find(p => p.participantID === participantIDCell);
-
-        if (!participant) {
-            invalidIDs.push(participantIDCell); // Add to invalid IDs
-            return null; // Skip this row
-        }
-
-        return {
-            participantID: participant.participantID,
-            participant: participant.name, // Save name for display purposes
-            breakfast: row.cells[1].querySelector('input').checked,
-            breakfastQuantity: parseInt(row.cells[2].querySelector('input').value) || 0,
-            lunch: row.cells[3].querySelector('input').checked,
-            lunchQuantity: parseInt(row.cells[4].querySelector('input').value) || 0,
-            dinner: row.cells[5].querySelector('input').checked,
-            dinnerQuantity: parseInt(row.cells[6].querySelector('input').value) || 0,
-            extras: parseFloat(row.cells[7].querySelector('input').value) || 0,
-            details: row.cells[8].querySelector('input').value || '',
-        };
-    }).filter(row => row !== null); // Exclude invalid rows
-
-    // Notify the user about invalid participant IDs
-    if (invalidIDs.length > 0) {
-        alert(`The following participant IDs are invalid and could not be saved:\n\n${invalidIDs.join('\n')}`);
-        return; // Stop the save process
-    }
-
-    if (rowsData.length === 0) {
-        alert('No valid rows to save.');
-        return;
-    }
-
     try {
         const db = await initIndexedDB(date);
-
         const transaction = db.transaction(monthStore, 'readwrite');
         const store = transaction.objectStore(monthStore);
 
+        // Retrieve existing data for the selected date
         const existingData = await new Promise((resolve, reject) => {
             const request = store.get(date);
-            request.onsuccess = () => resolve(request.result || { date, rowsData: [] });
+            request.onsuccess = () => resolve(request.result ? request.result.rowsData : []);
             request.onerror = (e) => reject(e);
         });
 
-        // Merge existing and new data based on participantID
-        const combinedData = [
-            ...existingData.rowsData.filter(
-                existingRow => !rowsData.some(newRow => newRow.participantID === existingRow.participantID)
-            ),
-            ...rowsData,
-        ];
+        // Convert existing data into a Map for easy updates
+        let existingDataMap = new Map(existingData.map(entry => [entry.participantID, entry]));
 
-        store.put({ date, rowsData: combinedData });
+        // Loop through all participants and ensure they are saved
+        participants.forEach(participant => {
+            let row = Array.from(tableBody.rows).find(r => r.getAttribute('data-participant-id') === participant.participantID);
+
+            let newEntry = {
+                participantID: participant.participantID,
+                participant: participant.name,
+                breakfast: row ? row.cells[1].querySelector('input').checked : false,
+                breakfastQuantity: row ? parseInt(row.cells[2].querySelector('input').value) || 0 : 0,
+                lunch: row ? row.cells[3].querySelector('input').checked : false,
+                lunchQuantity: row ? parseInt(row.cells[4].querySelector('input').value) || 0 : 0,
+                dinner: row ? row.cells[5].querySelector('input').checked : false,
+                dinnerQuantity: row ? parseInt(row.cells[6].querySelector('input').value) || 0 : 0,
+                extras: row ? parseFloat(row.cells[7].querySelector('input').value) || 0 : 0,
+                details: row ? row.cells[8].querySelector('input').value || '' : ''
+            };
+
+            // If participant already exists, update only changed fields
+            if (existingDataMap.has(participant.participantID)) {
+                let existingEntry = existingDataMap.get(participant.participantID);
+                Object.assign(existingEntry, newEntry); // Merge new changes
+            } else {
+                // Add new participant entry if they are not in existing data
+                existingDataMap.set(participant.participantID, newEntry);
+            }
+        });
+
+        // Convert back to array and save to IndexedDB
+        const updatedRowsData = Array.from(existingDataMap.values());
+        store.put({ date, rowsData: updatedRowsData });
 
         transaction.oncomplete = () => {
-            console.log('All rows saved successfully:', combinedData);
+            console.log(`Updated entries saved successfully for ${date}:`, updatedRowsData);
             alert('Table data saved successfully.');
         };
 
@@ -552,11 +541,14 @@ async function importCSVToScheduleDB(csvData) {
             }
 
             transaction.oncomplete = () => {
+                location.reload();
+                alert("Schedule imported successfully!");
                 console.log(`CSV data imported successfully into ${selectedMonth}.`);
                 resolve();
             };
 
             transaction.onerror = (event) => {
+                alert("Error while importing Schedule Detials");
                 console.error(`Error importing schedule CSV to ${selectedMonth}:`, event.target.errorCode);
                 reject(event.target.errorCode);
             };
@@ -644,5 +636,3 @@ resetTableButton.addEventListener("click", () => {
         resetTableData();
     }
 });
-
-

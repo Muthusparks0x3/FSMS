@@ -147,16 +147,85 @@ function saveParticipantChanges() {
     const transaction = db.transaction("participants", "readwrite");
     const store = transaction.objectStore("participants");
 
-    const request = store.put(updatedParticipant);
-    request.onsuccess = () => {
-        alert("Changes saved successfully!");
-        closeEditPopup();
-        loadParticipants();
+    const request = store.get(participantID);
+
+    request.onsuccess = async () => {
+        const existingParticipant = request.result;
+
+        if (!existingParticipant) {
+            alert("Participant not found.");
+            return;
+        }
+
+        const oldName = existingParticipant.name; // Store old name
+
+        // Save updated participant details
+        const updateRequest = store.put(updatedParticipant);
+        updateRequest.onsuccess = async () => {
+            alert("Changes saved successfully!");
+            closeEditPopup();
+            loadParticipants();
+
+            // Update name in schedule database only if the name was changed
+            if (oldName !== updatedParticipant.name) {
+                await updateParticipantNameInSchedule(participantID, updatedParticipant.name);
+                console.log(`Updated participant name in schedule for ID: ${participantID}`);
+            }
+        };
+
+        updateRequest.onerror = () => {
+            console.error("Error updating participant.");
+            alert("Failed to save changes. Please try again.");
+        };
     };
 
     request.onerror = () => {
-        console.error("Error updating participant.");
-        alert("Failed to save changes. Please try again.");
+        console.error("Error retrieving participant.");
+        alert("Failed to load participant details.");
+    };
+}
+
+async function updateParticipantNameInSchedule(participantID, newName) {
+    const dbRequest = indexedDB.open('FSMS_Schedule_Details_DB', dbVersion);
+
+    dbRequest.onsuccess = (event) => {
+        const db = event.target.result;
+
+        if (!db) {
+            console.error('Database does not exist or failed to open.');
+            return;
+        }
+
+        const objectStores = Array.from(db.objectStoreNames);
+        objectStores.forEach((storeName) => {
+            const transaction = db.transaction(storeName, 'readwrite');
+            const store = transaction.objectStore(storeName);
+
+            store.openCursor().onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    let record = cursor.value;
+                    let updated = false;
+
+                    record.rowsData.forEach(row => {
+                        if (row.participantID === participantID) {
+                            row.participant = newName; // Update name
+                            updated = true;
+                        }
+                    });
+
+                    if (updated) {
+                        cursor.update(record);
+                    }
+
+                    cursor.continue();
+                }
+            };
+        });
+    };
+
+    dbRequest.onerror = (e) => {
+        console.error('Failed to open FSMS_Schedule_Details_DB:', e);
     };
 }
 
@@ -368,3 +437,54 @@ ExportPage.addEventListener('click', function(){ // Redirect to the login page
 });
 
 searchBar.addEventListener("input", filterParticipants);
+
+(function () {
+    const tabID = Date.now().toString(); // Unique ID for the tab
+    const appKey = "FSMS_APP_ACTIVE_TAB"; // Storage key for the active tab
+    const channel = new BroadcastChannel("FSMS_TAB_CHANNEL"); // Communication channel
+
+    function checkActiveTab() {
+        const activeTab = localStorage.getItem(appKey);
+
+        if (activeTab && activeTab !== tabID) {
+            showTabWarning();
+        } else {
+            localStorage.setItem(appKey, tabID); // Mark this tab as active
+        }
+    }
+
+    function showTabWarning() {
+        alert("This application is already open in another tab. Please close other tabs to continue.");
+        document.body.innerHTML = "<h2 style='color: red; text-align: center;'>Application is already open in another tab. Please close other tabs.</h2>";
+    }
+
+    function handleTabChange(event) {
+        if (event.key === appKey && event.newValue !== tabID) {
+            showTabWarning();
+        }
+    }
+
+    function handleBroadcastMessage(event) {
+        if (event.data === "NEW_TAB_OPENED" && localStorage.getItem(appKey) !== tabID) {
+            showTabWarning();
+        }
+    }
+
+    function releaseTabLock() {
+        if (localStorage.getItem(appKey) === tabID) {
+            localStorage.removeItem(appKey);
+        }
+        channel.postMessage("TAB_CLOSED");
+    }
+
+    // Initial check for active tabs
+    checkActiveTab();
+
+    // Listen for tab changes
+    window.addEventListener("storage", handleTabChange);
+    channel.addEventListener("message", handleBroadcastMessage);
+    channel.postMessage("NEW_TAB_OPENED");
+
+    // Release lock when tab is closed
+    window.addEventListener("beforeunload", releaseTabLock);
+})();

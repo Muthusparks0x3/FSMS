@@ -38,7 +38,7 @@ const participantsStorage = document.getElementById('participantsStorage');
 const scheduleStorage = document.getElementById('scheduleStorage');
 const availableStorage = document.getElementById('availableStorage');
 // Predefined password
-const SETTINGS_PASSWORD = "Helix@0x3";
+const SETTINGS_PASSWORD = "Helix@123";
 
 let db;
 let participants = []; // Ensure participants array is defined here
@@ -163,9 +163,9 @@ function generateParticipantID(callback) {
 
 // Add participant
 function addParticipant() {
-    const name = document.getElementById('addName').value;
-    const mobile = document.getElementById('addMobile').value;
-    const address = document.getElementById('addAddress').value;
+    const name = document.getElementById('addName').value.trim();
+    const mobile = document.getElementById('addMobile').value.trim();
+    const address = document.getElementById('addAddress').value.trim();
 
     if (name && mobile && address) {
         generateParticipantID(function(ParticipantID) {
@@ -196,6 +196,8 @@ function addParticipant() {
         });
     } else {
         alert("All fields are required.");
+        popup.style.display = "block";
+        return;
     }
 }
 
@@ -275,6 +277,7 @@ function saveChanges() {
         const request = store.openCursor();
         request.onsuccess = function (event) {
             const cursor = event.target.result;
+            const oldName = cursor.name;
             if (cursor) {
                 if (cursor.value.participantID === participantID) {
                     const updatedParticipant = {
@@ -284,9 +287,13 @@ function saveChanges() {
                         address: address,
                     };
 
-                    cursor.update(updatedParticipant).onsuccess = function () {
+                    cursor.update(updatedParticipant).onsuccess = async function () {
                         alert("Participant details updated successfully!");
                         loadParticipants(); // Refresh participant table
+                        if (oldName !== name) {
+                            await updateParticipantNameInSchedule(participantID, name);
+                            console.log(`Updated participant name in schedule for ID: ${participantID}`);
+                        }
                     };
 
                     return; // Exit after updating
@@ -306,6 +313,76 @@ function saveChanges() {
     else {
         editParticipantPopup.style.display = 'block';
     }
+}
+
+async function updateParticipantNameInSchedule(participantID, newName) {
+    console.log(`Starting name update for participantID: ${participantID}`);
+
+    const dbRequest = indexedDB.open('FSMS_Schedule_Details_DB', dbVersion);
+
+    dbRequest.onsuccess = (event) => {
+        const db = event.target.result;
+
+        if (!db) {
+            console.error('Database does not exist or failed to open.');
+            return;
+        }
+
+        // Get all object store names (representing months)
+        const objectStores = Array.from(db.objectStoreNames);
+        console.log("Object store names:", objectStores);
+
+        objectStores.forEach((storeName) => {
+            const transaction = db.transaction(storeName, 'readwrite');
+            const store = transaction.objectStore(storeName);
+
+            const getAllRequest = store.getAll();
+
+            getAllRequest.onsuccess = () => {
+                const records = getAllRequest.result;
+                console.log(`Fetched ${records.length} records from store "${storeName}".`);
+
+                // Update participant name in records
+                const updatedRecords = records.map(record => {
+                    let updated = false;
+
+                    record.rowsData.forEach(row => {
+                        if (row.participantID === participantID) {
+                            console.log(`Updating name in store "${storeName}" for participantID: ${participantID}`);
+                            row.participant = newName; // Update name
+                            updated = true;
+                        }
+                    });
+
+                    return updated ? record : null; // Return only modified records
+                }).filter(record => record !== null);
+
+                if (updatedRecords.length > 0) {
+                    // Clear the store and insert updated records
+                    const clearRequest = store.clear();
+
+                    clearRequest.onsuccess = () => {
+                        console.log(`Cleared object store "${storeName}". Re-inserting updated records.`);
+                        updatedRecords.forEach(record => {
+                            store.put(record);
+                        });
+                    };
+
+                    clearRequest.onerror = (e) => {
+                        console.error(`Error clearing store "${storeName}":`, e);
+                    };
+                }
+            };
+
+            getAllRequest.onerror = (e) => {
+                console.error(`Error fetching data from store "${storeName}":`, e);
+            };
+        });
+    };
+
+    dbRequest.onerror = (e) => {
+        console.error('Failed to open FSMS_Schedule_Details_DB:', e);
+    };
 }
 
 // Delete participant
@@ -451,6 +528,7 @@ async function exportParticipantsToCSV() {
                     document.body.removeChild(link);
 
                     resolve("CSV exported successfully.");
+                    alert("Participants exported successfully!");
                 }
             };
 
@@ -565,10 +643,12 @@ function importCSVToIndexedDB(csvData) {
 
     transaction.oncomplete = () => {
         console.log("CSV data imported successfully to IndexedDB.");
+        alert("Participants imported successfully!");
         loadParticipants(); // Reload participants to reflect new data
     };
 
     transaction.onerror = (event) => {
+        alert("Error while importing Participant Details");
         console.error("Error importing CSV to IndexedDB:", event.target.errorCode);
     };
 }
@@ -790,7 +870,19 @@ importParticipantsDB.addEventListener("click", () => {
 
 // Event listeners
 addParticipantBtn.onclick = () => addParticipantPopup.style.display = 'block';
-closeAddPopup.onclick = () => addParticipantPopup.style.display = 'none';
+closeAddPopup.addEventListener("click", function() {
+    const name = document.getElementById("addName").value.trim();
+    const mobile = document.getElementById("addMobile").value.trim();
+    const address = document.getElementById("addAddress").value.trim();
+
+    if (name || mobile || address) {
+        if (confirm("You have unsaved changes. Are you sure you want to cancel?")) {
+            addParticipantPopup.style.display = "none";
+        }
+    } else {
+        addParticipantPopup.style.display = "none";
+    }
+});
 saveParticipantBtn.onclick = () => {
     addParticipant();
     addParticipantPopup.style.display = 'none';
@@ -854,4 +946,53 @@ window.onload = function () {
     initDB();
 };
 
+(function () {
+    const tabID = Date.now().toString(); // Unique ID for the tab
+    const appKey = "FSMS_APP_ACTIVE_TAB"; // Storage key for the active tab
+    const channel = new BroadcastChannel("FSMS_TAB_CHANNEL"); // Communication channel
 
+    function checkActiveTab() {
+        const activeTab = localStorage.getItem(appKey);
+
+        if (activeTab && activeTab !== tabID) {
+            showTabWarning();
+        } else {
+            localStorage.setItem(appKey, tabID); // Mark this tab as active
+        }
+    }
+
+    function showTabWarning() {
+        alert("This application is already open in another tab. Please close other tabs to continue.");
+        document.body.innerHTML = "<h2 style='color: red; text-align: center;'>Application is already open in another tab. Please close other tabs.</h2>";
+    }
+
+    function handleTabChange(event) {
+        if (event.key === appKey && event.newValue !== tabID) {
+            showTabWarning();
+        }
+    }
+
+    function handleBroadcastMessage(event) {
+        if (event.data === "NEW_TAB_OPENED" && localStorage.getItem(appKey) !== tabID) {
+            showTabWarning();
+        }
+    }
+
+    function releaseTabLock() {
+        if (localStorage.getItem(appKey) === tabID) {
+            localStorage.removeItem(appKey);
+        }
+        channel.postMessage("TAB_CLOSED");
+    }
+
+    // Initial check for active tabs
+    checkActiveTab();
+
+    // Listen for tab changes
+    window.addEventListener("storage", handleTabChange);
+    channel.addEventListener("message", handleBroadcastMessage);
+    channel.postMessage("NEW_TAB_OPENED");
+
+    // Release lock when tab is closed
+    window.addEventListener("beforeunload", releaseTabLock);
+})();

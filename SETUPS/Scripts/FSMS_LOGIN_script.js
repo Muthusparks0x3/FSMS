@@ -117,3 +117,54 @@ document.addEventListener('DOMContentLoaded', function() {
         alert('IndexedDB initialization failed!');
     };
 });
+
+(function () {
+    const tabID = Date.now().toString(); // Unique ID for the tab
+    const appKey = "FSMS_APP_ACTIVE_TAB"; // Storage key for the active tab
+    const channel = new BroadcastChannel("FSMS_TAB_CHANNEL"); // Communication channel
+
+    function checkActiveTab() {
+        const activeTab = localStorage.getItem(appKey);
+
+        if (activeTab && activeTab !== tabID) {
+            showTabWarning();
+        } else {
+            localStorage.setItem(appKey, tabID); // Mark this tab as active
+        }
+    }
+
+    function showTabWarning() {
+        alert("This application is already open in another tab. Please close other tabs to continue.");
+        document.body.innerHTML = "<h2 style='color: red; text-align: center;'>Application is already open in another tab. Please close other tabs.</h2>";
+    }
+
+    function handleTabChange(event) {
+        if (event.key === appKey && event.newValue !== tabID) {
+            showTabWarning();
+        }
+    }
+
+    function handleBroadcastMessage(event) {
+        if (event.data === "NEW_TAB_OPENED" && localStorage.getItem(appKey) !== tabID) {
+            showTabWarning();
+        }
+    }
+
+    function releaseTabLock() {
+        if (localStorage.getItem(appKey) === tabID) {
+            localStorage.removeItem(appKey);
+        }
+        channel.postMessage("TAB_CLOSED");
+    }
+
+    // Initial check for active tabs
+    checkActiveTab();
+
+    // Listen for tab changes
+    window.addEventListener("storage", handleTabChange);
+    channel.addEventListener("message", handleBroadcastMessage);
+    channel.postMessage("NEW_TAB_OPENED");
+
+    // Release lock when tab is closed
+    window.addEventListener("beforeunload", releaseTabLock);
+})();
