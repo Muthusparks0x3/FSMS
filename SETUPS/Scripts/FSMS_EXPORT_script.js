@@ -531,6 +531,7 @@ function exportToPDF() {
             startY: currentY + 10,
             head: [scheduleData[0]], // Set the first row as header
             body: scheduleData.slice(1),
+            bodyStyles: { textColor: [0, 0, 0] },
             styles: { lineColor: [0, 0, 0], lineWidth: 0.5 },
             theme: 'grid'
         });
@@ -548,6 +549,7 @@ function exportToPDF() {
             startY: currentY + 10,
             head: [summaryData[0]], // Set the first row as header
             body: summaryData.slice(1),
+            bodyStyles: { textColor: [0, 0, 0] },
             styles: { lineColor: [0, 0, 0], lineWidth: 0.5 },
             theme: 'grid'
         });
